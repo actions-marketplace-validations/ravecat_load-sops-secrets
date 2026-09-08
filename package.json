@@ -8,8 +8,15 @@
   },
   "scripts": {
     "build": "ncc build src/index.js -o dist --minify --license licenses.txt",
+    "debug": "node scripts/debug.js",
+    "predebug:workflow": "npm run build",
+    "debug:workflow": "env -u SOPS_AGE_KEY -u SOPS_AGE_KEY_FILE -u SOPS_AGE_KEY_CMD act workflow_dispatch --local-repository \"ravecat/load-sops-secrets@local=$PWD\"",
     "test": "node --test",
-    "test:integration": "node --test integration/sops.js"
+    "test:integration": "node --test integration/sops.js",
+    "lint:workflows": "actionlint .github/workflows/*.yml integration/workflow.yml",
+    "lint:docs": "markdownlint-cli2",
+    "check": "npm run build && npm run lint:workflows && npm run lint:docs && npm test && npm run test:integration",
+    "check:dist": "git ls-files --error-unmatch dist/index.js dist/package.json dist/licenses.txt > /dev/null && git diff --exit-code -- dist && test -z \"$(git ls-files --others --exclude-standard -- dist)\""
   },
   "dependencies": {
     "@actions/core": "3.0.1",

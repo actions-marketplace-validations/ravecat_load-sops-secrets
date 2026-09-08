@@ -1,0 +1,8 @@
+--workflows integration/workflow.yml
+--platform ubuntu-24.04=-self-hosted
+--env-file /dev/null
+--secret-file /dev/null
+--input-file /dev/null
+--var-file /dev/null
+--no-cache-server
+--verbose=false

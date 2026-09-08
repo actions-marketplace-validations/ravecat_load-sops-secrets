@@ -13,8 +13,11 @@
       in {
         devShells.default = pkgs.mkShell {
           packages = [
+            pkgs.act
+            pkgs.actionlint
             pkgs.age
             pkgs.git
+            pkgs.markdownlint-cli2
             pkgs.nodejs_24
             pkgs.sops
           ];

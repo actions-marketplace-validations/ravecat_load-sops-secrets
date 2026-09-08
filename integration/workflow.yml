@@ -1,0 +1,42 @@
+name: Debug local SOPS action
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash --noprofile --norc -eo pipefail {0}
+
+jobs:
+  debug:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Prepare synthetic fixture
+        id: fixture
+        run: node integration/prepare.js
+
+      - name: Load local SOPS action
+        id: sops
+        uses: ravecat/load-sops-secrets@local
+        with:
+          file: ${{ steps.fixture.outputs.file }}
+        env:
+          SOPS_AGE_KEY_FILE: ${{ steps.fixture.outputs.key }}
+
+      - name: Verify dynamic outputs
+        env:
+          DEMO_SECRET: ${{ steps.sops.outputs.demo_secret }}
+          MULTILINE: ${{ steps.sops.outputs.multiline }}
+          ALL_OUTPUTS: ${{ toJSON(steps.sops.outputs) }}
+        run: node integration/verify.js
+
+      - name: Remove synthetic fixture
+        if: ${{ always() && steps.fixture.outputs.directory != '' }}
+        env:
+          FIXTURE_DIRECTORY: ${{ steps.fixture.outputs.directory }}
+        run: rm -rf -- "${FIXTURE_DIRECTORY:?}"

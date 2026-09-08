@@ -62,25 +62,15 @@ Nonempty values are registered for log masking before outputs are written. Consu
 - Decryption credentials supplied in the action step's environment. The example uses age; `SOPS_AGE_KEY_FILE` can instead point to an identity file. Other SOPS credential providers remain caller-configured.
 - Network access to GitHub releases when SOPS is neither on `PATH` nor in the runner tool cache. The action downloads SOPS 3.13.1 and verifies its SHA-256 checksum. An existing `sops` on `PATH` is caller-managed.
 
-Local validation covers Linux x64. The installer includes Linux, macOS, and Windows binaries for x64 and arm64; the other platform combinations have not been validated here. GitHub supplies the Node.js runtime for this JavaScript action; consumers do not need npm or Nix.
+The automated checks target Ubuntu 24.04, and local validation covers Linux x64. The installer includes Linux, macOS, and Windows binaries for x64 and arm64; the other platform combinations have not been validated here. GitHub supplies the Node.js runtime for this JavaScript action; consumers do not need npm or Nix.
 
 Setup, decryption, invalid-document, and output-write failures fail the step with sanitized messages. Decryption diagnostics and malformed plaintext are not printed. Missing required input stops before decryption.
 
 ## Development
 
-With Nix and flakes enabled, run from this project's directory:
+The project uses JavaScript and the Node.js test runner, with dependencies in [package.json](package.json) and development tools in [flake.nix](flake.nix).
 
-```sh
-nix develop
-npm ci --ignore-scripts
-npm run build
-npm test
-npm run test:integration
-```
-
-Alternatively, run `direnv allow` once to load the Flake automatically. The tools are pinned in [flake.nix](flake.nix); npm dependencies and commands are defined in [package.json](package.json).
-
-The build bundles the source and its dependencies into `dist/`, which is committed with the action. Process tests exercise both source and distribution. The real SOPS integration test checks download, cache reuse, decryption, and wrong-key failure with disposable synthetic credentials; its initial download requires network access to GitHub releases.
+[Environment and checks](docs/development.md#environment-and-checks) | [Source debugging](docs/development.md#debug-the-source) | [Local workflow](docs/development.md#debug-the-workflow) | [Sibling checkout](docs/development.md#use-a-sibling-action-checkout) | [Development specification](docs/specs/local-action-debugging.md)
 
 ## License
 
