@@ -1,0 +1,19 @@
+name: Load SOPS secrets
+description: Load secrets from a SOPS-encrypted JSON file as masked step outputs
+author: Ravecat
+
+branding:
+  icon: lock
+  color: blue
+
+inputs:
+  file:
+    description: >-
+      Absolute or workspace-relative path to a SOPS-encrypted JSON object of strings.
+      SOPS is installed automatically when absent from PATH.
+      Supply decryption credentials in the environment.
+    required: true
+
+runs:
+  using: node24
+  main: dist/index.js

@@ -1,0 +1,23 @@
+{
+  "name": "load-sops-secrets",
+  "description": "Load secrets from a SOPS-encrypted JSON file as masked step outputs",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "ncc build src/index.js -o dist --minify --license licenses.txt",
+    "test": "node --test",
+    "test:integration": "node --test integration/sops.js"
+  },
+  "dependencies": {
+    "@actions/core": "3.0.1",
+    "@actions/exec": "3.0.0",
+    "@actions/io": "3.0.2",
+    "@actions/tool-cache": "4.0.0"
+  },
+  "devDependencies": {
+    "@vercel/ncc": "0.45.0"
+  }
+}
