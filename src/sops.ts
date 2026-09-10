@@ -6,7 +6,7 @@ import { join } from 'node:path';
 
 const version = '3.13.1';
 // SHA-256 values from the official sops-v3.13.1.checksums.txt release asset.
-const releases = {
+const releases: Readonly<Record<string, readonly [string, string]>> = {
   'linux-x64': ['linux.amd64', '620a9d7e3352ababeca6908cea24a6e8b14ce89a448ddbd3f94f1ef3398f470a'],
   'linux-arm64': ['linux.arm64', '19576fb1734dbf8fb77eda0cf0f3a2218f99bf4d33b814318e5e10d6babb9820'],
   'darwin-x64': ['darwin.amd64', 'dad79d1b1dea767ca38ffaa50e10330a3e807dd13c853ef9c880567acef4f1ef'],
@@ -15,7 +15,7 @@ const releases = {
   'win32-arm64': ['arm64.exe', 'dda6e1778f4248a2faa999735d16e97e80c9de0dae8c1da3f5fb79815bc78f26'],
 };
 
-export async function setupSops() {
+export async function setup(): Promise<string> {
   const installed = await which('sops');
   if (installed) return installed;
 
@@ -45,7 +45,7 @@ export async function setupSops() {
   return executable;
 }
 
-async function verifyChecksum(file, expected) {
+async function verifyChecksum(file: string, expected: string): Promise<void> {
   const actual = createHash('sha256').update(await readFile(file)).digest('hex');
   if (actual !== expected) throw new Error('SOPS checksum mismatch.');
 }

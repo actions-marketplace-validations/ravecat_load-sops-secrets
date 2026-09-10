@@ -13,7 +13,7 @@ try {
   delete env.SOPS_AGE_KEY_CMD;
   const child = spawn(process.execPath, [
     '--inspect-brk=127.0.0.1:9229',
-    fileURLToPath(new URL('../src/index.js', import.meta.url)),
+    fileURLToPath(new URL('../src/index.ts', import.meta.url)),
   ], {
     env,
     // A terminal does not redact the values carried by add-mask commands.

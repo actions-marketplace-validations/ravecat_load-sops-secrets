@@ -6,15 +6,16 @@ Status: Implemented and verified locally. This specification accompanies the loc
 
 Develop and validate this standalone action without publishing each edit or manually copying distribution into Infra. This extends the existing local-debugging outcome with consumer documentation, repeatable source debugging, shared synthetic workflow fixtures, and native GitHub CI coverage.
 
-This specification owns the project's development interface. Infra's `terraform-sops-variables` specification continues to own infrastructure credential delivery; this change does not modify Infra or the action's runtime contract. The local history introduces the Nix environment first, then the action with its distribution and behavior tests, then the workflow validation and debugging environment described here. Authoring and validation use a project-local worktree.
+This specification owns the project's development interface. Infra's `terraform-sops-variables` specification continues to own infrastructure credential delivery; this change does not modify Infra or the action's consumer contract. The local history introduces the Nix environment first, then the action with its distribution and behavior tests, then the workflow validation and debugging environment described here. This continuation includes the strict TypeScript authoring migration.
 
 ## Contract
 
 - README owns the consumer example, input/output contract, credential requirements, tested-platform limits, and same-job secret-output scope. It links to development instructions rather than embedding local setup and sibling-checkout walkthroughs.
 - `docs/development.md` owns environment entry, build/test/check commands, source breakpoints, local workflow execution, sibling overrides, CI behavior, and troubleshooting. This specification owns acceptance and validation evidence.
-- Keep JavaScript, Node.js 24, the Node test runner, ncc, and the existing Nix lock pins. Add actionlint and Markdown lint to the Flake so local development and CI use the same validators. Preserve `.envrc` and its optional ignored `.env` convention.
-- `npm run check` builds, validates workflow and Markdown files, and runs existing process and real-SOPS integration tests. A separate distribution check requires the generated files to be tracked, unchanged from the index, and free of untracked additions.
-- `npm run debug` creates disposable synthetic credentials and input/output files, pauses `src/index.js` with Node Inspector on loopback, suppresses action stdout, and cleans its fixture after normal exit, failure, or handled interruption. The editor attaches to the actual source process without Toolkit stubs.
+- Runtime source uses TypeScript with strict checking, checked indexed access, and exact optional property types. Test helpers remain JavaScript. Keep Node.js 24, the Node test runner, ncc, and the existing Nix lock pins. Preserve `.envrc` and its optional ignored `.env` convention.
+- `npm run typecheck` runs `tsc --noEmit` over `src/`. The same `.ts` sources run directly under Node.js 24 for source tests and debugging, using explicit `.ts` imports and erasable syntax. ncc compiles and bundles them into the unchanged `dist/index.js` consumer entrypoint. Runtime JSON validation, error messages, masking, cache integrity, and cleanup remain enforced by behavior tests.
+- `npm run check` checks types, builds, validates workflow, TypeScript/JavaScript, and Markdown files, and runs process and real-SOPS integration tests. `npm test` retains the fast source/bundle checks. A separate distribution check requires the generated files to be tracked and unchanged.
+- `npm run debug` creates disposable synthetic credentials and input/output files, pauses `src/index.ts` with Node Inspector on loopback, suppresses action stdout, and cleans its fixture after normal exit, failure, or handled interruption. The editor attaches to the actual TypeScript source process without Toolkit stubs.
 - A shared fixture builder supplies source debugging, local workflow, and GitHub workflow tests. It uses a private temporary directory, age identity, and encrypted JSON with ordinary, multiline, and empty values. Partial fixture creation is cleaned up. Existing real-download integration coverage remains separate.
 - `npm run debug:workflow` rebuilds and runs `integration/workflow.yml` through `act --local-repository`, mapping `ravecat/load-sops-secrets@local` to the current checkout. `.actrc` retains host execution and disables implicit local credential-file loading.
 - Native CI invokes `uses: ./` and verifies outputs in a later step. The local workflow retains its external-reference override to exercise the sibling-consumer development pattern. Both workflows use the shared fixture and assertion scripts, and clean fixtures with `always()`.
@@ -34,7 +35,7 @@ This specification owns the project's development interface. Infra's `terraform-
 - [x] Verify sibling-directory mapping, README/development links, example YAML, and distribution consistency.
 - [x] Reconcile this specification with observed results and include it in the local completion commit.
 
-## Validation results
+## Baseline validation results
 
 On Linux x64 with the unchanged lockfiles:
 
@@ -53,9 +54,18 @@ The narrow actionlint exception applies only to the two synthetic dynamic-output
 
 Before this continuation, the original local workflow was recorded as passing on Linux x64 with act 0.2.89, including a sibling-directory mapping and cleanup after controlled failure. The previous record also reported 35 passing process tests. Those historical results do not validate the new fixture builder, debugger wrapper, or CI changes.
 
+## TypeScript acceptance and verification
+
+- Strict TypeScript checks and ncc compilation preserve the JavaScript action entrypoint.
+- Source and bundle behavior tests continue to enforce parsing, masking, errors, and cache integrity.
+- Source tests and debugging use explicit `.ts` paths under Node.js 24.
+- The staged TypeScript snapshot passed a clean offline npm install and `npm run check` in the pinned Nix environment on 2026-09-11, including all 35 process tests and real SOPS integration.
+
 ## Rollback
 
 Revert the development tooling commit to remove its commands, fixture wiring, workflow checks, and supporting documentation together. The preceding action commit retains the runtime source, action metadata, distribution, and behavior tests. No infrastructure operation or credential migration is involved.
+
+To reverse only the TypeScript migration, restore the JavaScript source and its test/debug/build references, remove the compiler/parser dependencies and TypeScript configuration and check step, then rebuild and run the same behavior tests. The action metadata and consumer input/output contract do not change.
 
 ## References
 

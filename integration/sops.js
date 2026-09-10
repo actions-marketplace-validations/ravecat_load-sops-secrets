@@ -85,7 +85,7 @@ test('installs SOPS with an empty PATH, reuses its cache, and rejects a wrong ke
 
   const bundle = join(directory, 'dist', 'index.js');
   assertOutputs(run(bundle, identity));
-  const cached = run(fileURLToPath(new URL('../src/index.js', import.meta.url)), identity, true);
+  const cached = run(fileURLToPath(new URL('../src/index.ts', import.meta.url)), identity, true);
   assertOutputs(cached);
   assert.equal(cached.stdout.includes('Downloading'), false);
 

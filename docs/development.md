@@ -4,6 +4,8 @@
 
 The [Flake](../flake.nix) provides Node.js 24 with npm, Git, SOPS, age, `act`, `actionlint`, and `markdownlint-cli2`. Local development and GitHub CI use the same `flake.lock`; JavaScript dependencies are pinned in `package-lock.json`.
 
+Runtime source under `src/` uses strict TypeScript. TypeScript 6.0.3 is pinned for compatibility with ncc 0.45 and the ESLint TypeScript parser; TypeScript 7 changes the compiler API used by these tools. `tsc --noEmit` checks source types, while ncc compiles and bundles npm dependencies into the ready-to-run `dist/index.js`. Test helpers remain JavaScript.
+
 With Nix and flakes enabled, run from this project's directory:
 
 ```sh
@@ -16,17 +18,22 @@ Alternatively, run `direnv allow` once to load the environment on directory entr
 
 | Command | Purpose |
 | --- | --- |
-| `npm run build` | Bundle the source and npm dependencies into `dist/`. |
+| `npm run typecheck` | Check runtime TypeScript with strict compiler settings without emitting files. |
+| `npm run build` | Compile TypeScript and bundle npm dependencies into `dist/`. |
 | `npm test` | Check source and bundle behavior using a fake SOPS executable. Build first. |
 | `npm run test:integration` | Exercise real SOPS download, decryption, offline cache reuse, and a wrong key. Build first. |
+| `npm run lint` | Run workflow, source, and documentation lint. |
+| `npm run lint:js` | Check TypeScript source and JavaScript helpers and configuration with ESLint. |
 | `npm run lint:workflows` | Validate GitHub CI and the local workflow with actionlint. |
 | `npm run lint:docs` | Check README and documentation Markdown. |
-| `npm run check` | Build, lint workflows and documentation, then run both test layers. |
+| `npm run check` | Check types, build, lint, and run action and SOPS tests. |
 | `npm run check:dist` | Require the distribution files to be tracked and unchanged from the index, with no untracked distribution files. |
 | `npm run debug` | Create a disposable fixture and pause the actual source entrypoint in Node Inspector. |
 | `npm run debug:workflow` | Rebuild and execute the synthetic workflow with act. |
 
 The process tests cover source and distribution with the same cases, including malformed documents, required inputs, error sanitization, output encoding, and cache integrity. The real integration test needs network access for its first SOPS download; subsequent checks force offline cache reuse. Test data and keys are synthetic.
+
+Node.js 24 runs the `.ts` source directly by stripping erasable type syntax; type checking is performed separately by `npm run typecheck`. Relative source imports use explicit `.ts` extensions. The compiler configuration enforces erasable syntax and rewrites relative import extensions for the emitted bundle. Decrypted JSON enters the program as `unknown` and is validated before any decrypted values are masked or published; TypeScript does not replace those runtime checks.
 
 The test executables and workflow fixture currently use POSIX facilities. Run this development loop on Linux; Windows support requires adapting those fixtures before adding a Windows test matrix.
 
@@ -40,9 +47,9 @@ From the development environment:
 npm run debug
 ```
 
-The command creates a fresh age identity, encrypted JSON, and writable output file in a private temporary directory. It starts `src/index.js` with Node Inspector paused before execution, using that fixture instead of ambient age credentials.
+The command creates a fresh age identity, encrypted JSON, and writable output file in a private temporary directory. It starts `src/index.ts` with Node Inspector paused before execution, using that fixture instead of ambient age credentials.
 
-Attach your editor's Node.js debugger to `127.0.0.1:9229` and set a breakpoint in `src/main.js`. VS Code includes the **Attach to SOPS action** configuration in [.vscode/launch.json](../.vscode/launch.json). Continue execution, inspect the values, and disconnect when finished so Node can exit. Ctrl+C stops the child process and removes its fixture.
+Attach your editor's Node.js debugger to `127.0.0.1:9229` and set a breakpoint in `src/main.ts`. VS Code includes the **Attach to SOPS action** configuration in [.vscode/launch.json](../.vscode/launch.json). Continue execution, inspect the values, and disconnect when finished so Node can exit. Ctrl+C stops the child process and removes its fixture.
 
 Action stdout is discarded because a terminal does not process GitHub's `add-mask` commands and would print their values. The Inspector address remains visible on stderr. The wrapper removes the fixture after normal exit, failure, or a handled interruption. Forced termination such as SIGKILL can prevent cleanup, so only synthetic values are used.
 
@@ -111,3 +118,6 @@ A release must contain `action.yml` and the verified distribution at the Git ref
 - [act local repository mapping](https://github.com/nektos/act/blob/v0.2.89/cmd/root.go)
 - [act host execution](https://nektosact.com/usage/runners.html)
 - [act limitations](https://nektosact.com/not_supported.html)
+- [Node.js TypeScript support](https://nodejs.org/docs/latest-v24.x/api/typescript.html)
+- [ncc TypeScript support](https://github.com/vercel/ncc#with-typescript)
+- [TypeScript compiler API compatibility](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6-0)

@@ -55,7 +55,7 @@ The template supplies a local-action npm command, an example environment file, a
 
 The inspected local-action version is 7.0.1 at commit b9351d8a8f1e6eed27646f4d892b49a3847ba180. Its README says it emulates Toolkit functions and cannot stub dependencies already bundled into dist. Its published support table identifies @actions/core 2.0.2, while this project uses 3.0.1; that difference requires checking rather than assuming compatibility. Sources: [README](https://github.com/github/local-action/blob/b9351d8a8f1e6eed27646f4d892b49a3847ba180/README.md), [package manifest](https://github.com/github/local-action/blob/b9351d8a8f1e6eed27646f4d892b49a3847ba180/package.json), [local manifest](../../package.json).
 
-More concretely, its `setSecret` stub records the secret, and its `setOutput` stub skips values containing a registered secret. In this project, all nonempty secret values are registered before outputs are written. Inference from the inspected code: this emulator would reject those outputs if execution reaches the stub, even though GitHub documents this same-job step-output pattern as supported. It is therefore unsuitable as the sole verification of this action's output contract. This conclusion comes from source comparison, not a local-action execution performed in this research. Sources: [local-action core stub](https://github.com/github/local-action/blob/b9351d8a8f1e6eed27646f4d892b49a3847ba180/src/stubs/core/core.ts#L337), [our main function](../../src/main.js), [GitHub same-job example](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#example-masking-a-generated-output-within-a-single-job).
+More concretely, its `setSecret` stub records the secret, and its `setOutput` stub skips values containing a registered secret. In this project, all nonempty secret values are registered before outputs are written. Inference from the inspected code: this emulator would reject those outputs if execution reaches the stub, even though GitHub documents this same-job step-output pattern as supported. It is therefore unsuitable as the sole verification of this action's output contract. This conclusion comes from source comparison, not a local-action execution performed in this research. Sources: [local-action core stub](https://github.com/github/local-action/blob/b9351d8a8f1e6eed27646f4d892b49a3847ba180/src/stubs/core/core.ts#L337), [our main function](../../src/main.ts), [GitHub same-job example](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#example-masking-a-generated-output-within-a-single-job).
 
 Recommendation: keep direct Node Inspector as the default source debugger; an editor launch configuration and a disposable fixture setup can improve ergonomics without changing Toolkit behavior.
 
@@ -82,7 +82,7 @@ For diagnosing actual GitHub runs, document ACTIONS_STEP_DEBUG and ACTIONS_RUNNE
 | Documentation checks | No dedicated Markdown, link, metadata-to-README, or documented-example check appears in current scripts or CI | Start with one consumer example exercised as a workflow; use formatting/link checks where useful; avoid generating a large docs framework for a single input |
 | Local breakpoints | `node --inspect-brk src/index.js`, with environment and output-file setup documented | Make launch and fixture setup repeatable if this is a frequent workflow |
 
-Local evidence: [README](../../README.md), [package scripts](../../package.json), [CI](../../.github/workflows/test.yml), [process tests](../../test/index.test.js), [SOPS integration test](../../integration/sops.js), [installer](../../src/sops.js).
+Local evidence: [README](../../README.md), [package scripts](../../package.json), [CI](../../.github/workflows/test.yml), [process tests](../../test/index.test.js), [SOPS integration test](../../integration/sops.js), [installer](../../src/sops.ts).
 
 ## Recommended documentation boundary
 
@@ -97,7 +97,7 @@ The consumer-facing material should explain:
 5. Same-job scope of secret outputs, sanitized errors, and limits of log masking.
 6. The release reference consumers can use after publication; distinguish a placeholder example from a version that actually exists.
 
-These items are inferred directly from [action metadata](../../action.yml), [runtime behavior](../../src/main.js), [SOPS setup](../../src/sops.js), and the official README guidance above. No public release was verified during this research.
+These items are inferred directly from [action metadata](../../action.yml), [runtime behavior](../../src/main.ts), [SOPS setup](../../src/sops.ts), and the official README guidance above. No public release was verified during this research.
 
 Documentation validation has separate levels: Markdown formatting checks presentation; link checks catch broken references; metadata generation checks parameter drift; an executed workflow example checks whether documented usage actually works. No one of these proves the others. A native same-job output test provides the most direct additional assurance for this project's documented use case.
 
@@ -169,3 +169,7 @@ Revision and star metadata came from each repository's first-party `api.github.c
 7. For a SOPS action, infer a small acceptance set from its actual contract: synthetic encrypted fixture decryption; missing/invalid key and malformed input; downloaded versus preinstalled SOPS where supported; output transport including multiline/special characters; and absence of plaintext secrets in captured diagnostics. Use public test-only keys and synthetic values for such fixtures. Keep real cloud/OIDC integration separate from the default local loop if it is needed at all.
 
 No schema/link checker or automatic README-example runner was established by this bounded inspection. This does not exclude checks in shared organization infrastructure or other uninspected files. No CI runs or debugger configurations were executed; observations describe source definitions, not verified current pass rates.
+
+## TypeScript source follow-up, 2026-09-09
+
+The runtime source now uses strict TypeScript while the Node test runner, JavaScript helpers, and ncc delivery bundle remain in place. The explicit compiler check runs through `npm run typecheck`; Node.js 24 executes the same TypeScript source directly for process tests and debugging. ncc includes the runtime npm dependencies in `dist/index.js`, preserving the consumer entrypoint. This extends the current authoring and delivery work; the earlier assessment above remains historical. Source paths in maintained links now resolve to `.ts` files. See the [development contract](../specs/local-action-debugging.md) for migration constraints and verification.

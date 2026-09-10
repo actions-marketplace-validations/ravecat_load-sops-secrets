@@ -76,7 +76,7 @@ function parseOutputs(text) {
   return outputs;
 }
 
-for (const entry of ['src/index.js', 'dist/index.js']) {
+for (const entry of ['src/index.ts', 'dist/index.js']) {
   test(`${entry}: dynamic outputs preserve strings and register masks`, t => {
     const secrets = {
       api_token: 'synthetic-api-token',
@@ -188,7 +188,7 @@ for (const entry of ['src/index.js', 'dist/index.js']) {
 }
 
 test('main module can be imported without running the action', async () => {
-  const { run } = await import('../src/main.js');
+  const { run } = await import('../src/main.ts');
   assert.equal(typeof run, 'function');
   assert.equal(process.exitCode, undefined);
 });

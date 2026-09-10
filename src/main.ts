@@ -3,18 +3,20 @@ import { getExecOutput } from '@actions/exec';
 import { constants } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { setupSops } from './sops.js';
+import { setup } from './sops.ts';
 
-export async function run() {
+export async function run(): Promise<void> {
   let failure = 'A file input and a writable GITHUB_OUTPUT file are required.';
 
   try {
     const file = core.getInput('file', { required: true });
     if (file === '') throw new Error();
-    await access(process.env.GITHUB_OUTPUT, constants.W_OK);
+    const output = process.env.GITHUB_OUTPUT;
+    if (output === undefined) throw new Error();
+    await access(output, constants.W_OK);
 
     failure = 'SOPS setup failed. Check platform support, network access, and the runner tool cache.';
-    const executable = await setupSops();
+    const executable = await setup();
 
     failure = 'SOPS decryption failed. Check the file and decryption key.';
     const path = resolve(process.env.GITHUB_WORKSPACE || process.cwd(), file);
@@ -25,14 +27,15 @@ export async function run() {
     );
 
     failure = 'Decrypted SOPS content must be a JSON object of strings with valid, case-insensitively unique output names.';
-    const secrets = JSON.parse(stdout);
+    const secrets: unknown = JSON.parse(stdout);
     if (secrets === null || typeof secrets !== 'object' || Array.isArray(secrets)) {
       throw new Error();
     }
 
-    const entries = Object.entries(secrets);
+    const values: [string, unknown][] = Object.entries(secrets);
+    const entries: [string, string][] = [];
     const names = new Set();
-    for (const [name, value] of entries) {
+    for (const [name, value] of values) {
       if (
         !/^[a-zA-Z_][a-zA-Z0-9_-]*$/.test(name) ||
         typeof value !== 'string' ||
@@ -41,6 +44,7 @@ export async function run() {
         throw new Error();
       }
       names.add(name.toLowerCase());
+      entries.push([name, value]);
     }
 
     failure = 'Could not register secret masks or write action outputs.';

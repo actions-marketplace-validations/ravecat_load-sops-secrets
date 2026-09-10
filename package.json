@@ -8,7 +8,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "ncc build src/index.js -o dist --minify --license licenses.txt",
+    "build": "ncc build src/index.ts -o dist --minify --license licenses.txt",
     "debug": "node scripts/debug.js",
     "predebug:workflow": "npm run build",
     "debug:workflow": "env -u SOPS_AGE_KEY -u SOPS_AGE_KEY_FILE -u SOPS_AGE_KEY_CMD act workflow_dispatch --local-repository \"ravecat/load-sops-secrets@local=$PWD\"",
@@ -16,8 +16,11 @@
     "test:integration": "node --test integration/sops.js",
     "lint:workflows": "actionlint .github/workflows/*.yml integration/workflow.yml",
     "lint:docs": "markdownlint-cli2",
-    "check": "npm run build && npm run lint:workflows && npm run lint:docs && npm test && npm run test:integration",
-    "check:dist": "git ls-files --error-unmatch dist/index.js dist/package.json dist/licenses.txt > /dev/null && git diff --exit-code -- dist && test -z \"$(git ls-files --others --exclude-standard -- dist)\""
+    "check": "npm run typecheck && npm run build && npm run lint && npm test && npm run test:integration",
+    "check:dist": "git ls-files --error-unmatch dist/index.js dist/package.json dist/licenses.txt > /dev/null && git diff --exit-code -- dist && test -z \"$(git ls-files --others --exclude-standard -- dist)\"",
+    "lint:js": "eslint .",
+    "lint": "npm run lint:workflows && npm run lint:js && npm run lint:docs",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@actions/core": "3.0.1",
@@ -26,6 +29,12 @@
     "@actions/tool-cache": "4.0.0"
   },
   "devDependencies": {
-    "@vercel/ncc": "0.45.0"
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.13.3",
+    "@typescript-eslint/parser": "8.70.0",
+    "@vercel/ncc": "0.45.0",
+    "eslint": "10.10.0",
+    "globals": "17.12.0",
+    "typescript": "6.0.3"
   }
 }
