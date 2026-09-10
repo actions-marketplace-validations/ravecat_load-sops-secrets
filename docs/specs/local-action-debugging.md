@@ -1,30 +1,29 @@
 # Action development and workflow debugging
 
-Status: Implemented and verified locally. This specification accompanies the local completion commit. Publication and the first GitHub-hosted run remain outside this local delivery.
-
 ## Purpose and ownership
 
 Develop and validate this standalone action without publishing each edit or manually copying distribution into Infra. This extends the existing local-debugging outcome with consumer documentation, repeatable source debugging, shared synthetic workflow fixtures, and native GitHub CI coverage.
 
-This specification owns the project's development interface. Infra's `terraform-sops-variables` specification continues to own infrastructure credential delivery; this change does not modify Infra; the action now requires an explicit key input. The local history introduces the Nix environment first, then the action with its distribution and behavior tests, then the workflow validation and debugging environment described here. This continuation includes the strict TypeScript authoring migration.
+This specification owns the project's development interface, including migration of runtime source to strict TypeScript and the associated type checking, tests, and source debugger. Infra's `terraform-sops-variables` specification continues to own infrastructure credential delivery; this change does not modify Infra. The output-key follow-up removes the action's custom naming restrictions while preserving string-value validation and masking. The local history introduces the Nix environment first, then the action source and behavior tests, then the workflow validation and debugging environment described here. TypeScript migration and the explicit key input extend these authoring and delivery improvements.
 
 ## Contract
 
-- JSON keys pass unchanged to `core.setOutput`, without a naming regex, normalization, or case-folded uniqueness check. The full decrypted document must still be a JSON object of strings before any decrypted-value masks or outputs are written. Process tests verify unusual and case-distinct names at the `GITHUB_OUTPUT` write boundary; they do not emulate GitHub runner key lookup.
-
 - README owns the consumer example, input/output contract, credential requirements, tested-platform limits, and same-job secret-output scope. It links to development instructions rather than embedding local setup and sibling-checkout walkthroughs.
-- `docs/development.md` owns environment entry, build/test/check commands, source breakpoints, local workflow execution, sibling overrides, CI behavior, and troubleshooting. This specification owns acceptance and validation evidence.
-- Runtime source uses TypeScript with strict checking, checked indexed access, and exact optional property types. Test helpers remain JavaScript. Keep Node.js 24, the Node test runner, ncc, and the existing Nix lock pins. Preserve `.envrc` and its optional ignored `.env` convention.
+- JSON keys pass unchanged to `core.setOutput`, without a naming regex, normalization, or case-folded uniqueness check. The full decrypted document must still be a JSON object of strings before any decrypted-value masks or outputs are written. Process tests verify unusual and case-distinct names at the `GITHUB_OUTPUT` write boundary; they do not emulate GitHub runner key lookup.
+- `docs/development.md` owns environment entry, build/test/check commands, source breakpoints, local workflow execution, sibling overrides, CI behavior, and troubleshooting. This specification owns the development contract.
+- Runtime source uses TypeScript with strict checking, checked indexed access, and exact optional property types. Test helpers and release configuration remain JavaScript. Keep Node.js 24, the Node test runner, ncc, and the existing Nix lock pins. Preserve `.envrc` and its optional ignored `.env` convention.
 - `npm run typecheck` runs `tsc --noEmit` over `src/`. The same `.ts` sources run directly under Node.js 24 for source tests and debugging, using explicit `.ts` imports and erasable syntax. ncc compiles and bundles them into the unchanged `dist/index.js` consumer entrypoint. Runtime JSON validation, error messages, masking, cache integrity, and cleanup remain enforced by behavior tests.
-- `npm run check` checks types, builds, validates workflow, TypeScript/JavaScript, and Markdown files, and runs process and real-SOPS integration tests. `npm test` retains the fast source/bundle checks. A separate distribution check requires the generated files to be tracked and unchanged.
+- `npm run check` checks types, builds, validates workflow, TypeScript/JavaScript, and Markdown files, and runs process and real-SOPS integration tests. `npm test` retains the fast source/bundle checks.
 - `npm run debug` creates disposable synthetic credentials and input/output files, pauses `src/index.ts` with Node Inspector on loopback, suppresses action stdout, and cleans its fixture after normal exit, failure, or handled interruption. The editor attaches to the actual TypeScript source process without Toolkit stubs.
 - One shared fixture builder supplies source debugging, local and GitHub workflow tests, and real-SOPS integration. It uses a private temporary directory, age identity, and encrypted JSON with ordinary, multiline, and empty values, plus dotted, spaced, numeric-leading, and Unicode keys. Partial fixture creation is cleaned up, and each caller owns final cleanup. Real-download integration retains cold installation, offline cache reuse, and wrong-key coverage. Mocked process fixtures remain separate for controlled parsing and failure scenarios.
 - The generator accepts caller-provided document values. The workflow smoke case uses LF for act compatibility, while real-SOPS integration checks CRLF, percent signs, and quotes without normalizing its output assertions.
 - `npm run debug:workflow` rebuilds and runs `integration/workflow.yml` through `act --local-repository`, mapping `ravecat/load-sops-secrets@local` to the current checkout. `.actrc` retains host execution and disables implicit local credential-file loading.
 - Native CI invokes `uses: ./` and verifies outputs in a later step. The local workflow retains its external-reference override to exercise the sibling-consumer development pattern. Both workflows use the shared fixture and assertion scripts, and clean fixtures with `always()`.
+- One CI workflow owns inline `lint`, `test`, and `release` jobs. Branch pushes, pull requests, and manual dispatches run lint and test in parallel without reusable workflows or routing inputs. Release requires both checks to succeed before building its own distribution bundle. Tag pushes do not trigger CI.
+- The default branch is read from `github.event.repository.default_branch` and compared against `github.ref_name`, with `github.ref_type == 'branch'` excluding tags. A push to that branch runs only semantic-release dry-run after successful checks. A manual CI dispatch on that branch runs fresh lint and test jobs before normal semantic-release execution; publication still depends on releasable commits. Both commands explicitly pass the same default branch through `--branches "$RELEASE_BRANCH"`; release configuration contains no static branch selection. Changing the repository default from `master` to `main` requires no edits. Pull requests and other refs skip only the release job. Release execution remains serialized with `contents: write`, including dry-run's push-permission verification; check jobs retain read-only permissions.
 - Workflows mask the generated multiline identity and pass its text as a same-job output into `with.key`, alongside `with.file`. Source and act entry commands retain the inherited environment and supply synthetic file and key inputs. Assertions report failure without printing decrypted values. Forced process termination may prevent cleanup; fixtures remain synthetic.
 - Ubuntu 24.04 is the configured CI target. Local verification is Linux x64. The installer binary matrix must not be presented as tested cross-platform support; POSIX test fixtures require adaptation before Windows CI is added.
-- Consumer overrides must match the exact `uses` repository and ref. Infra's `ravecat/load-sops-secrets@v1` maps to this checkout, while the standalone debug workflow uses `@local`. No production workflow or release tag is changed.
+- Consumer overrides must match the exact `uses` repository and ref. Infra's `ravecat/load-sops-secrets@v1` maps to this checkout, while the standalone debug workflow uses `@local`. No Infra workflow or release tag is changed.
 
 ## Key input contract and acceptance
 
@@ -36,55 +35,61 @@ This specification owns the project's development interface. Infra's `terraform-
 - README, debugger, and both workflow fixtures use the same `file`/`key` contract. Native CI and local act verify the masked multiline fixture output reaches `with.key`; fixture cleanup remains required.
 - This change preserves the JavaScript action runtime, SOPS installation/cache behavior, arbitrary JSON-key outputs, and same-job consumption. It does not introduce Docker or modify Infra.
 
-## Verification
+## Development verification
 
-- [x] Establish the isolated baseline: npm installation, ncc build, and all 35 existing tests pass.
-- [x] Evaluate the extended Flake without changing either lockfile and resolve the expected tools through Nix and direnv.
-- [x] Run `npm run check` and verify workflow/Markdown lint, process tests, and real SOPS integration.
-- [x] Execute `npm run debug:workflow` and verify output transport and fixture cleanup.
-- [x] Validate native `uses: ./` workflow behavior locally, while clearly distinguishing act from a GitHub-hosted run.
-- [x] Attach to the source debugger, hit a source breakpoint, resume, disconnect, and verify successful exit and fixture cleanup.
-- [x] Verify interrupted source debugging and controlled workflow failure also clean their fixtures.
-- [x] Verify sibling-directory mapping, README/development links, example YAML, and distribution consistency.
-- [x] Reconcile this specification with observed results and include it in the local completion commit.
+Verified on Linux x64 on 2026-09-09:
 
-## Baseline validation results
+- `npm ci --ignore-scripts` installs the pinned compiler, parser, and Node types from the lockfile.
+- `npm run check` passes strict type checking without skipping dependency declarations, ncc compilation, all lint checks, 33 source/bundle tests, and real SOPS integration.
+- `npm run debug:workflow` passes the actual bundled action and output assertions through act, including dotted, spaced, numeric-leading, and Unicode keys.
+- An Inspector protocol smoke check starts `scripts/debug.js`, sets and hits a breakpoint in `src/main.ts`, resumes successful execution, and verifies fixture cleanup.
+- Read-only review found no runtime contract or tooling defects.
 
-On Linux x64 with the unchanged lockfiles:
+Key-input verification on Linux x64 on 2026-09-10:
 
-- `nix develop --command npm run check` passed workflow lint, Markdown lint, all 35 source/bundle process tests, and the real SOPS installation/decryption/cache integration test.
-- `npm run debug:workflow` passed checkout, fixture preparation, action execution, output assertions, and cleanup using act 0.2.89. Checkout is necessary to make the shared helper files available in act's runner workspace.
-- The native CI action block was executed locally with `uses: ./` after checkout. The validation harness omitted the GitHub-specific Nix bootstrap and checks already run directly; it did not claim a full hosted CI run. Output assertions and an additional cleanup assertion passed.
-- A controlled ciphertext corruption failed with the sanitized decryption error, then passed the `always()` cleanup and a subsequent absence check. A temporary sibling consumer resolved `ravecat/load-sops-secrets@v1` to the worktree and passed the same assertions. These validation runs used an unreachable Docker socket and host execution.
-- A Node Inspector client attached on loopback, set and hit a breakpoint in `src/main.js`, resumed, disconnected, and observed exit code zero. It verified mode 0700 on the temporary directory, mode 0600 on key/ciphertext/output files, suppressed stdout, and cleanup. A SIGTERM run also removed its fixture. Both checks passed with invalid inherited age credentials and a failing inherited key command.
-- A missing-tool fixture check failed with a sanitized message and left no partial directory. The builder uses a private synthetic plaintext file during encryption because Node child stdin cannot be reopened by SOPS through `/dev/stdin`; the plaintext is deleted immediately after encryption.
-- `direnv exec .` resolved Node.js 24, Git, SOPS, age, act, actionlint 1.7.12, and markdownlint-cli2 0.22.1 from the Flake. Markdown lint also passed through direnv.
-- Local Markdown paths and anchors, the README workflow structure, JSON configurations, ignore rules, whitespace, and distribution consistency were checked. Runtime source, action metadata, `flake.lock`, and `package-lock.json` match the baseline.
+- `nix develop --command npm run check` passed strict type checking, the distribution build, all lint checks, 41 source/bundle tests, and real SOPS integration. The integration rejects a wrong explicit key even when the ambient key is valid, and checks that key material appears only in masking commands.
+- `nix develop --command npm run debug:workflow` passed masked multiline key transport through `with.key`, decryption, all dynamic-output assertions, and fixture cleanup. The fixture dependency installation uses the pinned Nix shell through `path:.` because act's copied workspace has incomplete Git metadata.
+- An Inspector smoke check resumed `scripts/debug.js` with invalid inherited key settings, verified successful source execution with the generated `INPUT_KEY`, confirmed suppressed stdout, and checked fixture cleanup.
+- Review confirmed that test, release, and local workflows supply both required inputs. The release workflow was inspected and linted; no release or GitHub-hosted run was performed.
 
-The narrow actionlint exception applies only to the two synthetic dynamic-output names in the CI workflow. GitHub permits undeclared JavaScript action outputs; runtime assertions verify these values and the full output object. Markdown lint checks document structure, while a separate inspection checked local links and the README example. No claim is made that Markdown lint executes examples or validates remote links.
+Earlier separate-workflow verification on Linux x64 on 2026-09-10:
 
-## Previous validation
+- `nix develop --command npm run check` passed strict type checking, the distribution build, workflow/source/documentation lint, 41 source/bundle tests, and the real SOPS integration test after adding reusable checks and release event guards.
+- A temporary act simulation of copies of the three workflows retained their reusable calls, dependencies, and event/ref guards while replacing commands with harmless probes. All nine cases passed: master push selects dry-run, master manual dispatch selects publication, either failed check blocks release for either event, non-master manual dispatch skips all Release jobs, and a skipped check blocks release in both sampled event cases.
+- Diff review and `git diff --check` passed. No semantic-release command, publication, or GitHub-hosted workflow was run; simulation does not validate release credentials or hosted-runner behavior.
 
-Before this continuation, the original local workflow was recorded as passing on Linux x64 with act 0.2.89, including a sibling-directory mapping and cleanup after controlled failure. The previous record also reported 35 passing process tests. Those historical results do not validate the new fixture builder, debugger wrapper, or CI changes.
+Earlier reusable-workflow default-branch verification on Linux x64 on 2026-09-10:
 
-## Output-key verification
+- `nix develop --command npm run lint` passed workflow, source/configuration, and documentation lint. Runtime source was unchanged; the preceding full check remains applicable.
+- A temporary act simulation of copied workflows preserved conditions, dependencies, reusable inputs, and the release branch environment. Harmless probes replaced checks/builds, and a fake npm executable captured the actual release command arguments. All 19 cases passed, covering default branches `master`, `main`, and `release/stable`; push dry-run versus manual execution; exact `--branches` forwarding; old-master and other-branch exclusion; same-name tag exclusion on manual dispatch; failed/skipped check gates; and retained PR and standalone manual checks.
+- Running the simulated push workflows together verified exactly one lint and test execution on default-branch pushes. Diff review and `git diff --check` passed; workflow files and release configuration contain no hardcoded `master` references. No real semantic-release command, credentials, external actions, or GitHub-hosted run was used.
 
-The staged output-key snapshot passed `npm run check` in the pinned Nix environment on 2026-09-11, including all 41 process tests and real SOPS integration. Tests verify unchanged names at the output-file boundary and retain complete string-value validation.
+Unified CI verification on Linux x64 on 2026-09-10:
 
-## Key input verification
+- `nix develop --command npm run lint` passed workflow, source/configuration, and documentation lint. Parsed lint/test step arrays match the preceding workflow bodies exactly; both jobs run without conditions or dependencies, and CI contains only the three inline jobs.
+- All 18 temporary act simulations passed with a copied CI workflow, harmless check probes, and actual release arguments routed to a fake npm executable. They verified default-branch push/manual modes and branch arguments, other-branch and same-name-tag manual checks without release, failed/skipped check gates, and PR exclusion even with a default-branch ref. Each invocation executed lint and test once.
+- Diff review and `git diff --check` passed. Runtime source and release configuration were unchanged. No real semantic-release command, credentials, external actions, or GitHub-hosted run was used.
 
-The staged key-input snapshot passed `npm run check` in the pinned Nix environment on 2026-09-11, including all 43 process tests and real SOPS integration. The final workflow and source-debugger checks also passed with synthetic `file` and `key` inputs.
+Inherited-environment simplification verification on Linux x64 on 2026-09-10:
 
-## TypeScript acceptance and verification
+- Removed runtime deletion of inherited `SOPS_AGE_KEY_FILE` and `SOPS_AGE_KEY_CMD` and the synthetic test settings used to verify that deletion. The required `file`/`key` contract, key masking, and replacement of inherited `SOPS_AGE_KEY` remain covered.
+- `nix develop --command npm run check` passed strict type checking, the distribution build, all lint checks, 41 source/bundle tests, and real SOPS integration covering cold installation, offline cache reuse, and wrong-key rejection.
 
-- Strict TypeScript checks and ncc compilation preserve the JavaScript action entrypoint.
-- Source and bundle behavior tests continue to enforce parsing, masking, errors, and cache integrity.
-- Source tests and debugging use explicit `.ts` paths under Node.js 24.
-- The staged TypeScript snapshot passed a clean offline npm install and `npm run check` in the pinned Nix environment on 2026-09-11, including all 35 process tests and real SOPS integration.
+Input-key masking simplification verification on Linux x64 on 2026-09-10:
+
+- Removed the duplicate JSON-escaped input-key mask registration, retaining one `core.setSecret(key)` call. The standard GitHub runner supplies JSON escaping; decrypted-value mask registration remains unchanged.
+- `nix develop --command npm run check` passed strict type checking, the distribution build, all lint checks, 41 source/bundle tests, and real SOPS integration. Tests verify one input-key mask command, including wrong-key failure; they do not emulate runner log redaction.
+
+Debug-environment simplification verification on Linux x64 on 2026-09-11:
+
+- Removed inherited age-variable cleanup from both debug entrypoints. `nix develop --command npm run lint` passed, and `nix develop --command npm run debug:workflow` passed the direct act invocation, distribution build, fixture setup, dynamic-output assertions, and cleanup.
+- An Inspector smoke check resumed `scripts/debug.js` and verified exit code zero, suppressed stdout, and fixture cleanup. No inherited age variables were present or artificially injected; the earlier invalid-environment smoke result describes the preceding implementation.
+
+This specification accompanies the local completion commits for TypeScript authoring, the required key input, output-key passthrough, and CI/release configuration. The earlier verification results describe the preceding TypeScript, key-input, and separate-workflow changes.
 
 ## Rollback
 
-Revert the development tooling commit to remove its commands, fixture wiring, workflow checks, and supporting documentation together. The preceding action commit retains the runtime source, action metadata, distribution, and behavior tests. No infrastructure operation or credential migration is involved.
+Revert each affected behavior together with its tests, configuration, and supporting documentation. TypeScript authoring, the required key input, output-key passthrough, and CI/release configuration are separate changes; account for dependencies when reverting earlier changes. Build the local distribution before executing it. No infrastructure operation or credential migration is involved.
 
 To reverse only the TypeScript migration, restore the JavaScript source and its test/debug/build references, remove the compiler/parser dependencies and TypeScript configuration and check step, then rebuild and run the same behavior tests. The action metadata and consumer input/output contract do not change.
 

@@ -1,5 +1,5 @@
 paths:
-  .github/workflows/test.yml:
+  .github/workflows/ci.yml:
     ignore:
       # GitHub permits dynamic outputs; the following step verifies these fixture keys.
       - '^property "(demo_secret|multiline)" is not defined in object type \{\}$'

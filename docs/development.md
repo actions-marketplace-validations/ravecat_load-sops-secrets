@@ -2,9 +2,9 @@
 
 ## Environment and checks
 
-The [Flake](../flake.nix) provides Node.js 24 with npm, Git, SOPS, age, `act`, `actionlint`, and `markdownlint-cli2`. Local development and GitHub CI use the same `flake.lock`; JavaScript dependencies are pinned in `package-lock.json`.
+The [Flake](../flake.nix) provides Node.js 24.16.0 with npm, Git, SOPS, age, `act`, `actionlint`, and `markdownlint-cli2`. Local development and GitHub CI use the same `flake.lock`; JavaScript dependencies are pinned in `package-lock.json`. Development tooling requires Node.js 24.15.0 or newer; the action metadata continues to select the GitHub Node.js 24 runtime.
 
-Runtime source under `src/` uses strict TypeScript. TypeScript 6.0.3 is pinned for compatibility with ncc 0.45 and the ESLint TypeScript parser; TypeScript 7 changes the compiler API used by these tools. `tsc --noEmit` checks source types, while ncc compiles and bundles npm dependencies into the ready-to-run `dist/index.js`. Test helpers remain JavaScript.
+Runtime source under `src/` uses strict TypeScript. TypeScript 6.0.3 is pinned for compatibility with ncc 0.45 and the ESLint TypeScript parser; TypeScript 7 changes the compiler API used by these tools. `tsc --noEmit` checks source types, while ncc compiles and bundles npm dependencies into the ready-to-run `dist/index.js`. Test helpers and release configuration remain JavaScript.
 
 With Nix and flakes enabled, run from this project's directory:
 
@@ -20,14 +20,13 @@ Alternatively, run `direnv allow` once to load the environment on directory entr
 | --- | --- |
 | `npm run typecheck` | Check runtime TypeScript with strict compiler settings without emitting files. |
 | `npm run build` | Compile TypeScript and bundle npm dependencies into `dist/`. |
-| `npm test` | Check source and bundle behavior using a fake SOPS executable. Build first. |
+| `npm test` | Check source and bundle behavior without network access. Build first. |
 | `npm run test:integration` | Exercise real SOPS download, decryption, offline cache reuse, and a wrong key. Build first. |
 | `npm run lint` | Run workflow, source, and documentation lint. |
-| `npm run lint:js` | Check TypeScript source and JavaScript helpers and configuration with ESLint. |
 | `npm run lint:workflows` | Validate GitHub CI and the local workflow with actionlint. |
+| `npm run lint:js` | Check TypeScript source and JavaScript helpers and configuration with ESLint. |
 | `npm run lint:docs` | Check README and documentation Markdown. |
 | `npm run check` | Check types, build, lint, and run action and SOPS tests. |
-| `npm run check:dist` | Require the distribution files to be tracked and unchanged from the index, with no untracked distribution files. |
 | `npm run debug` | Create a disposable fixture and pause the actual source entrypoint in Node Inspector. |
 | `npm run debug:workflow` | Rebuild and execute the synthetic workflow with act. |
 
@@ -91,17 +90,15 @@ Replace the workflow path and action directory with your local paths. Build the 
 
 Infra uses `ravecat/load-sops-secrets@v1`, so its override uses `@v1` while this project's standalone workflow uses `@local`. act prepares its own runner workspace from the mapped checkout. GitHub execution requires a published repository and revision; it cannot read a directory on your computer.
 
-## GitHub CI and distribution
+## GitHub CI checks
 
-The [CI workflow](../.github/workflows/test.yml) installs the pinned environment and npm dependencies, runs `npm run check`, and checks distribution consistency. It then invokes the checked-out action with `uses: ./` and verifies the outputs in the next step. This covers `action.yml`, the built entrypoint, and the same input/credential/output pattern shown in README.
+[ci.yml](../.github/workflows/ci.yml) runs on branch pushes, pull requests, and manual dispatches. Its `lint` and `test` jobs run in parallel on every invocation. Lint checks workflows, TypeScript types, source, and Markdown. Test builds the action and covers source and bundle behavior, real SOPS integration, and a native `uses: ./` invocation with output verification in the next step.
 
-The direct action step uses GitHub's Node.js 24 runtime. The custom Nix shell applies to `run` steps only, so the action's SOPS lookup and automatic installation also run in the consumer environment. All credentials in this test are disposable age identities; no repository secret is required.
+The `release` job requires both checks to succeed and runs only for a push or manual dispatch on the current default branch from `github.event.repository.default_branch`. It rebuilds the bundle in its own runner. A push runs `npm run release -- --branches "$RELEASE_BRANCH" --dry-run` to preview the next release. A manual CI dispatch runs fresh checks before `npm run release -- --branches "$RELEASE_BRANCH"` can publish. `RELEASE_BRANCH` comes from the same event metadata, so changing the default branch from `master` to `main` requires no workflow or release configuration edits. Pull requests and other refs run checks without release execution. Tag pushes do not trigger CI.
 
-Local act validation and static workflow checks do not establish that GitHub CI has passed. The first GitHub-hosted run must be checked after publication.
+The release job serializes release attempts and holds `contents: write`; the check jobs have read-only access. Dry-run also needs release credentials because semantic-release verifies push permission. It does not publish a release. A manual run publishes only when semantic-release finds releasable commits.
 
-After source or dependency changes, rebuild and include `dist/index.js`, `dist/package.json`, and `dist/licenses.txt` with the change. `npm run check:dist` detects a missing, stale, or untracked distribution in a clean CI checkout. It is expected to fail locally while new distribution files have not been staged.
-
-A release must contain `action.yml` and the verified distribution at the Git ref consumers use. Publishing an npm package is unnecessary. Release publication and tag management remain separate from local development checks.
+The native action step uses GitHub's Node.js 24 runtime. The custom Nix shell applies to `run` steps only, so SOPS lookup and automatic installation run in the consumer environment. Test credentials are disposable age identities, and fixtures are cleaned after success or failure.
 
 ## Troubleshooting
 
@@ -115,13 +112,15 @@ A release must contain `action.yml` and the verified distribution at the Git ref
 ## References
 
 - [GitHub JavaScript action template](https://github.com/actions/javascript-action)
+- [Checkout test workflow](https://github.com/actions/checkout/blob/f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a/.github/workflows/test.yml)
+- [GitHub workflow triggers](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)
 - [GitHub action documentation guidance](https://docs.github.com/en/actions/how-tos/create-and-publish-actions/manage-custom-actions)
 - [GitHub debug logging](https://docs.github.com/en/actions/how-tos/monitor-workflows/enable-debug-logging)
 - [Node.js Inspector](https://nodejs.org/docs/latest-v24.x/api/debugger.html#v8-inspector-integration-for-nodejs)
+- [Node.js TypeScript support](https://nodejs.org/docs/latest-v24.x/api/typescript.html)
+- [ncc TypeScript support](https://github.com/vercel/ncc#with-typescript)
+- [TypeScript compiler API compatibility](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6-0)
 - [SOPS 3.13.1 release](https://github.com/getsops/sops/releases/tag/v3.13.1)
 - [act local repository mapping](https://github.com/nektos/act/blob/v0.2.89/cmd/root.go)
 - [act host execution](https://nektosact.com/usage/runners.html)
 - [act limitations](https://nektosact.com/not_supported.html)
-- [Node.js TypeScript support](https://nodejs.org/docs/latest-v24.x/api/typescript.html)
-- [ncc TypeScript support](https://github.com/vercel/ncc#with-typescript)
-- [TypeScript compiler API compatibility](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6-0)

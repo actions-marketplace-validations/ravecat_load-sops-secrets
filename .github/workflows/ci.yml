@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: nix develop --command bash --noprofile --norc -eo pipefail {0}
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v17
+      - name: Cache Nix store
+        uses: DeterminateSystems/magic-nix-cache-action@v13
+      - run: npm ci --ignore-scripts
+      - name: Lint workflows
+        run: npm run lint:workflows
+      - name: Type check
+        run: npm run typecheck
+      - name: Lint JavaScript and TypeScript
+        run: npm run lint:js
+      - name: Lint documentation
+        run: npm run lint:docs
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v17
+      - name: Cache Nix store
+        uses: DeterminateSystems/magic-nix-cache-action@v13
+      - run: npm ci --ignore-scripts
+      - name: Build action bundle
+        run: npm run build
+      - name: Test source and bundle
+        run: npm test
+      - name: Test real SOPS integration
+        run: npm run test:integration
+      - name: Prepare synthetic fixture
+        id: fixture
+        run: node integration/prepare.js
+      - name: Load secrets through the action metadata
+        id: sops
+        uses: ./
+        with:
+          file: ${{ steps.fixture.outputs.file }}
+          key: ${{ steps.fixture.outputs.key }}
+      - name: Verify outputs in the next step
+        env:
+          DEMO_SECRET: ${{ steps.sops.outputs.demo_secret }}
+          MULTILINE: ${{ steps.sops.outputs.multiline }}
+          ALL_OUTPUTS: ${{ toJSON(steps.sops.outputs) }}
+        run: node integration/verify.js
+      - name: Remove synthetic fixture
+        if: ${{ always() && steps.fixture.outputs.directory != '' }}
+        env:
+          FIXTURE_DIRECTORY: ${{ steps.fixture.outputs.directory }}
+        run: rm -rf -- "${FIXTURE_DIRECTORY:?}"
+  release:
+    if: >-
+      github.ref_type == 'branch' &&
+      github.ref_name == github.event.repository.default_branch &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    needs: [lint, test]
+    concurrency:
+      group: release-${{ github.ref }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    env:
+      RELEASE_BRANCH: ${{ github.event.repository.default_branch }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v17
+      - name: Cache Nix store
+        uses: DeterminateSystems/magic-nix-cache-action@v13
+      - run: npm ci --ignore-scripts
+      - name: Build release bundle
+        run: npm run build
+      - name: Preview semantic release
+        if: github.event_name == 'push'
+        run: npm run release -- --branches "$RELEASE_BRANCH" --dry-run
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish semantic release
+        if: github.event_name == 'workflow_dispatch'
+        run: npm run release -- --branches "$RELEASE_BRANCH"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
