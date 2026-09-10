@@ -74,4 +74,4 @@ The project uses JavaScript and the Node.js test runner, with dependencies in [p
 
 ## License
 
-No license has been declared yet.
+Licensed under the [MIT License](LICENSE).

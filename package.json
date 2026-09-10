@@ -2,6 +2,7 @@
   "name": "load-sops-secrets",
   "description": "Load secrets from a SOPS-encrypted JSON file as masked step outputs",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=24"
