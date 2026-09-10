@@ -10,13 +10,15 @@ This specification owns the project's development interface. Infra's `terraform-
 
 ## Contract
 
+- JSON keys pass unchanged to `core.setOutput`, without a naming regex, normalization, or case-folded uniqueness check. The full decrypted document must still be a JSON object of strings before any decrypted-value masks or outputs are written. Process tests verify unusual and case-distinct names at the `GITHUB_OUTPUT` write boundary; they do not emulate GitHub runner key lookup.
+
 - README owns the consumer example, input/output contract, credential requirements, tested-platform limits, and same-job secret-output scope. It links to development instructions rather than embedding local setup and sibling-checkout walkthroughs.
 - `docs/development.md` owns environment entry, build/test/check commands, source breakpoints, local workflow execution, sibling overrides, CI behavior, and troubleshooting. This specification owns acceptance and validation evidence.
 - Runtime source uses TypeScript with strict checking, checked indexed access, and exact optional property types. Test helpers remain JavaScript. Keep Node.js 24, the Node test runner, ncc, and the existing Nix lock pins. Preserve `.envrc` and its optional ignored `.env` convention.
 - `npm run typecheck` runs `tsc --noEmit` over `src/`. The same `.ts` sources run directly under Node.js 24 for source tests and debugging, using explicit `.ts` imports and erasable syntax. ncc compiles and bundles them into the unchanged `dist/index.js` consumer entrypoint. Runtime JSON validation, error messages, masking, cache integrity, and cleanup remain enforced by behavior tests.
 - `npm run check` checks types, builds, validates workflow, TypeScript/JavaScript, and Markdown files, and runs process and real-SOPS integration tests. `npm test` retains the fast source/bundle checks. A separate distribution check requires the generated files to be tracked and unchanged.
 - `npm run debug` creates disposable synthetic credentials and input/output files, pauses `src/index.ts` with Node Inspector on loopback, suppresses action stdout, and cleans its fixture after normal exit, failure, or handled interruption. The editor attaches to the actual TypeScript source process without Toolkit stubs.
-- One shared fixture builder supplies source debugging, local and GitHub workflow tests, and real-SOPS integration. It uses a private temporary directory, age identity, and encrypted JSON with ordinary, multiline, and empty values. Partial fixture creation is cleaned up, and each caller owns final cleanup. Real-download integration retains cold installation, offline cache reuse, and wrong-key coverage. Mocked process fixtures remain separate for controlled parsing and failure scenarios.
+- One shared fixture builder supplies source debugging, local and GitHub workflow tests, and real-SOPS integration. It uses a private temporary directory, age identity, and encrypted JSON with ordinary, multiline, and empty values, plus dotted, spaced, numeric-leading, and Unicode keys. Partial fixture creation is cleaned up, and each caller owns final cleanup. Real-download integration retains cold installation, offline cache reuse, and wrong-key coverage. Mocked process fixtures remain separate for controlled parsing and failure scenarios.
 - The generator accepts caller-provided document values. The workflow smoke case uses LF for act compatibility, while real-SOPS integration checks CRLF, percent signs, and quotes without normalizing its output assertions.
 - `npm run debug:workflow` rebuilds and runs `integration/workflow.yml` through `act --local-repository`, mapping `ravecat/load-sops-secrets@local` to the current checkout. `.actrc` retains host execution and disables implicit local credential-file loading.
 - Native CI invokes `uses: ./` and verifies outputs in a later step. The local workflow retains its external-reference override to exercise the sibling-consumer development pattern. Both workflows use the shared fixture and assertion scripts, and clean fixtures with `always()`.
@@ -32,7 +34,7 @@ This specification owns the project's development interface. Infra's `terraform-
 - Forward the inherited environment to the SOPS child process with `SOPS_AGE_KEY` set from `key`. Preserve all other environment variables, and neither mutate the parent environment nor write runtime key files or include the key in command arguments.
 - Source and bundled process tests must cover required/blank keys, multiline input, masking on failure, and explicit-key precedence over inherited `SOPS_AGE_KEY`. Real integration must decrypt using `INPUT_KEY`, preserve cold installation and offline cache coverage, and reject a wrong explicit key despite a valid ambient key.
 - README, debugger, and both workflow fixtures use the same `file`/`key` contract. Native CI and local act verify the masked multiline fixture output reaches `with.key`; fixture cleanup remains required.
-- This change preserves the JavaScript action runtime, SOPS installation/cache behavior, the existing output-name validation, and same-job consumption. It does not introduce Docker or modify Infra.
+- This change preserves the JavaScript action runtime, SOPS installation/cache behavior, arbitrary JSON-key outputs, and same-job consumption. It does not introduce Docker or modify Infra.
 
 ## Verification
 
@@ -64,6 +66,10 @@ The narrow actionlint exception applies only to the two synthetic dynamic-output
 ## Previous validation
 
 Before this continuation, the original local workflow was recorded as passing on Linux x64 with act 0.2.89, including a sibling-directory mapping and cleanup after controlled failure. The previous record also reported 35 passing process tests. Those historical results do not validate the new fixture builder, debugger wrapper, or CI changes.
+
+## Output-key verification
+
+The staged output-key snapshot passed `npm run check` in the pinned Nix environment on 2026-09-11, including all 41 process tests and real SOPS integration. Tests verify unchanged names at the output-file boundary and retain complete string-value validation.
 
 ## Key input verification
 

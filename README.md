@@ -45,12 +45,14 @@ This action currently supports only SOPS-encrypted files that decrypt to a flat 
 | `file` | Yes | Absolute path, or a path relative to the workflow workspace, to the SOPS-encrypted JSON file. |
 | `key` | Yes | Age private identity text used to decrypt the file. Multiline identities are supported. |
 
-Each JSON key becomes an output with the same name. Read a known key with `steps.sops.outputs.demo_secret`, or serialize all outputs with `toJSON(steps.sops.outputs)`. There is no built-in aggregate output named `secrets`.
+Each JSON key becomes an output with the same name. Read a known key with `steps.sops.outputs.demo_secret` or bracket access such as `steps.sops.outputs['api.token']`, or serialize all outputs with `toJSON(steps.sops.outputs)`. There is no built-in aggregate output named `secrets`.
 
 - Values must be strings. Nested objects, arrays, numbers, booleans, and null are rejected.
-- Names must match `[a-zA-Z_][a-zA-Z0-9_-]*` and be unique ignoring case.
+- JSON keys are passed through unchanged, without name validation, normalization, or case-insensitive uniqueness checks.
 - Empty strings and multiline values are preserved. An empty object produces no outputs.
-- The complete document is validated before any outputs are published.
+- The JSON object structure and all string values are validated before any outputs are published.
+
+GitHub's [output-file format](https://github.com/actions/runner/blob/main/src/Runner.Worker/FileCommandManager.cs) still applies: empty names and names containing newlines, `=`, or `<<` cannot be transported reliably. Its [output lookup is case-insensitive](https://github.com/actions/runner/blob/main/src/Sdk/DTPipelines/Pipelines/ContextData/DictionaryContextData.cs), so `TOKEN` and `token` collide and the later value wins.
 
 Pass the key through `with.key` at job runtime from a trusted secret source. GitHub Actions secrets are one option; an earlier trusted step can also fetch the key from a secret manager and expose it as a masked output within the same job. The action accepts the key text regardless of its storage provider or secret name and registers it for masking before SOPS setup or decryption.
 

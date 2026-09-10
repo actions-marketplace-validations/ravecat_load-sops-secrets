@@ -108,6 +108,25 @@ for (const entry of ['src/index.ts', 'dist/index.js']) {
     }
   });
 
+  test(`${entry}: writes JSON keys unchanged at the GITHUB_OUTPUT boundary`, t => {
+    const secrets = {
+      'api.token': 'dotted-value',
+      'api token': 'spaced-value',
+      '123token': 'numeric-leading-value',
+      'ключ': 'unicode-value',
+      token: 'lowercase-value',
+      TOKEN: 'uppercase-value',
+    };
+    const result = runAction(t, entry, JSON.stringify(secrets));
+    assert.equal(result.status, 0);
+    const headers = result.output.split('\n').filter(line => line.includes('<<ghadelimiter_'));
+    assert.deepEqual(headers.map(header => header.split('<<')[0]), Object.keys(secrets));
+    for (const header of headers) {
+      const [name, delimiter] = header.split('<<');
+      assert.ok(result.output.includes(`${header}\n${secrets[name]}\n${delimiter}\n`));
+    }
+  });
+
   test(`${entry}: an empty object yields only the input key mask`, t => {
     const result = runAction(t, entry, '{}');
     assert.equal(result.status, 0);
@@ -131,8 +150,6 @@ for (const entry of ['src/index.ts', 'dist/index.js']) {
     'scalar document': '"synthetic-private-value"',
     'nested value': '{"valid":"synthetic-private-value","nested":{"key":"value"}}',
     'non-string value': '{"valid":"synthetic-private-value","number":1}',
-    'invalid output name': '{"valid":"synthetic-private-value","bad\\nname":"value"}',
-    'case-insensitive collision': '{"token":"synthetic-private-value","TOKEN":"different"}',
   };
   for (const [scenario, document] of Object.entries(invalidDocuments)) {
     test(`${entry}: rejects ${scenario} before publishing outputs`, t => {
@@ -140,7 +157,7 @@ for (const entry of ['src/index.ts', 'dist/index.js']) {
       assert.equal(result.status, 1);
       assert.equal(result.output, '');
       assert.equal(result.calls.length, 1);
-      assert.equal(result.stdout, `${keyMasks}::error::Decrypted SOPS content must be a JSON object of strings with valid, case-insensitively unique output names.\n`);
+      assert.equal(result.stdout, `${keyMasks}::error::Decrypted SOPS content must be a JSON object of strings.\n`);
     });
   }
 

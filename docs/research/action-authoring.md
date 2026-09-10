@@ -91,7 +91,7 @@ For this small action, README should own consumer usage and the public contract.
 The consumer-facing material should explain:
 
 1. A workflow step with id, file input, supplied decryption environment, and use of a known output in a later step through env.
-2. The decrypted shape: a flat JSON object of strings; treatment of empty and multiline values; output-name constraints and case-insensitive collisions.
+2. The decrypted shape: a flat JSON object of strings; treatment of empty and multiline values; unchanged output names, GitHub output-file limits, and case-insensitive lookup.
 3. Dynamic outputs, including that an output called secrets is just an ordinary key rather than a built-in aggregate.
 4. Existing SOPS versus automatically downloaded SOPS, network needs, and tested runtime/platform requirements.
 5. Same-job scope of secret outputs, sanitized errors, and limits of log masking.

@@ -7,6 +7,10 @@ export const secrets = {
   demo_secret: 'local-example-value',
   multiline: 'first\nsecond',
   empty: '',
+  'api.token': 'dotted-example-value',
+  'api key': 'spaced-example-value',
+  '1password': 'numeric-leading-example-value',
+  'ключ': 'unicode-example-value',
 };
 
 export function createFixture(values = secrets) {

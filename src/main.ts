@@ -33,7 +33,7 @@ export async function run(): Promise<void> {
       { silent: true, input: Buffer.alloc(0), env },
     );
 
-    failure = 'Decrypted SOPS content must be a JSON object of strings with valid, case-insensitively unique output names.';
+    failure = 'Decrypted SOPS content must be a JSON object of strings.';
     const secrets: unknown = JSON.parse(stdout);
     if (secrets === null || typeof secrets !== 'object' || Array.isArray(secrets)) {
       throw new Error();
@@ -41,16 +41,8 @@ export async function run(): Promise<void> {
 
     const values: [string, unknown][] = Object.entries(secrets);
     const entries: [string, string][] = [];
-    const names = new Set();
     for (const [name, value] of values) {
-      if (
-        !/^[a-zA-Z_][a-zA-Z0-9_-]*$/.test(name) ||
-        typeof value !== 'string' ||
-        names.has(name.toLowerCase())
-      ) {
-        throw new Error();
-      }
-      names.add(name.toLowerCase());
+      if (typeof value !== 'string') throw new Error();
       entries.push([name, value]);
     }
 
