@@ -11,7 +11,7 @@
     "build": "ncc build src/index.ts -o dist --minify --license licenses.txt",
     "debug": "node scripts/debug.js",
     "predebug:workflow": "npm run build",
-    "debug:workflow": "env -u SOPS_AGE_KEY -u SOPS_AGE_KEY_FILE -u SOPS_AGE_KEY_CMD act workflow_dispatch --local-repository \"ravecat/load-sops-secrets@local=$PWD\"",
+    "debug:workflow": "act workflow_dispatch --local-repository \"ravecat/load-sops-secrets@local=$PWD\"",
     "test": "node --test",
     "test:integration": "node --test integration/sops.js",
     "lint:workflows": "actionlint .github/workflows/*.yml integration/workflow.yml",

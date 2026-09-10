@@ -6,14 +6,21 @@ import { resolve } from 'node:path';
 import { setup } from './sops.ts';
 
 export async function run(): Promise<void> {
-  let failure = 'A file input and a writable GITHUB_OUTPUT file are required.';
+  let failure = 'File and key inputs and a writable GITHUB_OUTPUT file are required.';
 
   try {
     const file = core.getInput('file', { required: true });
-    if (file === '') throw new Error();
+    const key = core.getInput('key', { required: true });
+    if (file === '' || key === '') throw new Error();
     const output = process.env.GITHUB_OUTPUT;
     if (output === undefined) throw new Error();
     await access(output, constants.W_OK);
+    core.setSecret(key);
+
+    const env: Record<string, string> = Object.fromEntries(
+      Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined),
+    );
+    env.SOPS_AGE_KEY = key;
 
     failure = 'SOPS setup failed. Check platform support, network access, and the runner tool cache.';
     const executable = await setup();
@@ -23,7 +30,7 @@ export async function run(): Promise<void> {
     const { stdout } = await getExecOutput(
       executable,
       ['decrypt', '--output-type', 'json', path],
-      { silent: true, input: Buffer.alloc(0) },
+      { silent: true, input: Buffer.alloc(0), env },
     );
 
     failure = 'Decrypted SOPS content must be a JSON object of strings with valid, case-insensitively unique output names.';

@@ -11,7 +11,10 @@ inputs:
     description: >-
       Absolute or workspace-relative path to a SOPS-encrypted JSON object of strings.
       SOPS is installed automatically when absent from PATH.
-      Supply decryption credentials in the environment.
+    required: true
+
+  key:
+    description: Age private identity text used to decrypt the file. Supports multiline identities.
     required: true
 
 runs:

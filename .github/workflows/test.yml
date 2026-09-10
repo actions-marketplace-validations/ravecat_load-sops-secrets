@@ -37,8 +37,7 @@ jobs:
         uses: ./
         with:
           file: ${{ steps.fixture.outputs.file }}
-        env:
-          SOPS_AGE_KEY_FILE: ${{ steps.fixture.outputs.key }}
+          key: ${{ steps.fixture.outputs.key }}
 
       - name: Verify outputs in the next step
         env:

@@ -6,6 +6,9 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
+const key = '# synthetic identity\nAGE-SECRET-KEY-SYNTHETIC';
+const keyMasks = `::add-mask::${key.replaceAll('\n', '%0A')}\n`;
+
 const actionDirectory = fileURLToPath(new URL('..', import.meta.url));
 
 function runAction(t, entry, document, options = {}) {
@@ -21,6 +24,7 @@ function runAction(t, entry, document, options = {}) {
   writeFileSync(join(directory, 'sops'), `#!${process.execPath}
 import { appendFileSync, readFileSync } from 'node:fs';
 appendFileSync('calls', JSON.stringify(process.argv.slice(2)) + '\\n');
+appendFileSync('child-env', JSON.stringify({ key: process.env.SOPS_AGE_KEY, workspace: process.env.GITHUB_WORKSPACE }));
 if (process.env.SOPS_TEST_STDIN && readFileSync(0).length !== 0) process.exit(2);
 process.stderr.write('synthetic private diagnostic');
 process.stdout.write(readFileSync(process.argv.at(-1)));
@@ -39,6 +43,7 @@ process.exit(Number(process.env.SOPS_TEST_EXIT || 0));
     env: {
       PATH: directory,
       INPUT_FILE: file,
+      INPUT_KEY: key,
       GITHUB_WORKSPACE: workspace,
       GITHUB_OUTPUT: join(directory, 'output'),
       GITHUB_ENV: join(directory, 'environment'),
@@ -56,6 +61,7 @@ process.exit(Number(process.env.SOPS_TEST_EXIT || 0));
     : [];
   if (calls.length > 0) {
     assert.deepEqual(calls, [['decrypt', '--output-type', 'json', resolve(workspace, file)]]);
+    assert.deepEqual(JSON.parse(readFileSync(join(directory, 'child-env'), 'utf8')), { key: (options.INPUT_KEY ?? key).trim(), workspace });
   }
   return { ...result, calls, output: readFileSync(join(directory, 'output'), 'utf8') };
 }
@@ -102,11 +108,11 @@ for (const entry of ['src/index.ts', 'dist/index.js']) {
     }
   });
 
-  test(`${entry}: an empty object yields no outputs or masks`, t => {
+  test(`${entry}: an empty object yields only the input key mask`, t => {
     const result = runAction(t, entry, '{}');
     assert.equal(result.status, 0);
     assert.equal(result.output, '');
-    assert.equal(result.stdout, '');
+    assert.equal(result.stdout, keyMasks);
     assert.equal(result.calls.length, 1);
   });
 
@@ -114,7 +120,7 @@ for (const entry of ['src/index.ts', 'dist/index.js']) {
     const result = runAction(t, entry, '{}', { SOPS_TEST_STDIN: '1' });
     assert.equal(result.status, 0);
     assert.equal(result.output, '');
-    assert.equal(result.stdout, '');
+    assert.equal(result.stdout, keyMasks);
     assert.equal(result.calls.length, 1);
   });
 
@@ -134,7 +140,7 @@ for (const entry of ['src/index.ts', 'dist/index.js']) {
       assert.equal(result.status, 1);
       assert.equal(result.output, '');
       assert.equal(result.calls.length, 1);
-      assert.equal(result.stdout, '::error::Decrypted SOPS content must be a JSON object of strings with valid, case-insensitively unique output names.\n');
+      assert.equal(result.stdout, `${keyMasks}::error::Decrypted SOPS content must be a JSON object of strings with valid, case-insensitively unique output names.\n`);
     });
   }
 
@@ -143,16 +149,16 @@ for (const entry of ['src/index.ts', 'dist/index.js']) {
     assert.equal(result.status, 1);
     assert.equal(result.output, '');
     assert.equal(result.calls.length, 1);
-    assert.equal(result.stdout, '::error::SOPS decryption failed. Check the file and decryption key.\n');
+    assert.equal(result.stdout, `${keyMasks}::error::SOPS decryption failed. Check the file and decryption key.\n`);
   });
 
-  for (const variable of ['INPUT_FILE', 'GITHUB_OUTPUT']) {
+  for (const variable of ['INPUT_FILE', 'INPUT_KEY', 'GITHUB_OUTPUT']) {
     test(`${entry}: missing ${variable} stops before decryption`, t => {
       const result = runAction(t, entry, '{}', { [variable]: '' });
       assert.equal(result.status, 1);
       assert.equal(result.output, '');
       assert.equal(result.calls.length, 0);
-      assert.equal(result.stdout, '::error::A file input and a writable GITHUB_OUTPUT file are required.\n');
+      assert.equal(result.stdout, '::error::File and key inputs and a writable GITHUB_OUTPUT file are required.\n');
     });
   }
 
@@ -161,14 +167,34 @@ for (const entry of ['src/index.ts', 'dist/index.js']) {
     assert.equal(result.status, 1);
     assert.equal(result.output, '');
     assert.equal(result.calls.length, 0);
-    assert.equal(result.stdout, '::error::A file input and a writable GITHUB_OUTPUT file are required.\n');
+    assert.equal(result.stdout, '::error::File and key inputs and a writable GITHUB_OUTPUT file are required.\n');
   });
+
+  test(`${entry}: explicit multiline key replaces ambient SOPS_AGE_KEY`, t => {
+    const result = runAction(t, entry, '{}', {
+      INPUT_KEY: `  ${key}\n`,
+      SOPS_AGE_KEY: 'ambient-key',
+    });
+    assert.equal(result.status, 0);
+    assert.equal(result.stdout, keyMasks);
+  });
+
+  for (const input of ['', ' \t\n ']) {
+    test(`${entry}: missing or blank key cannot fall back to ambient credentials (${JSON.stringify(input)})`, t => {
+      const result = runAction(t, entry, '{}', { INPUT_KEY: input, SOPS_AGE_KEY: 'ambient-key' });
+      assert.equal(result.status, 1);
+      assert.equal(result.calls.length, 0);
+      assert.equal(result.output, '');
+      assert.equal(result.stdout, '::error::File and key inputs and a writable GITHUB_OUTPUT file are required.\n');
+    });
+  }
 
   test(`${entry}: missing SOPS and runner cache fail without publishing outputs`, t => {
     const result = runAction(t, entry, '{}', { PATH: '' });
     assert.equal(result.status, 1);
     assert.equal(result.output, '');
     assert.equal(result.calls.length, 0);
+    assert.ok(result.stdout.startsWith(keyMasks));
     assert.equal(result.stdout.split('\n').filter(line => line.startsWith('::error::')).join('\n'), '::error::SOPS setup failed. Check platform support, network access, and the runner tool cache.');
   });
 
@@ -183,6 +209,7 @@ for (const entry of ['src/index.ts', 'dist/index.js']) {
     assert.equal(result.status, 1);
     assert.equal(result.output, '');
     assert.equal(result.calls.length, 0);
+    assert.ok(result.stdout.startsWith(keyMasks));
     assert.equal(result.stdout.split('\n').filter(line => line.startsWith('::error::')).join('\n'), '::error::SOPS setup failed. Check platform support, network access, and the runner tool cache.');
   });
 }

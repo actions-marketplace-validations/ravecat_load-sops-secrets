@@ -170,6 +170,10 @@ Revision and star metadata came from each repository's first-party `api.github.c
 
 No schema/link checker or automatic README-example runner was established by this bounded inspection. This does not exclude checks in shared organization infrastructure or other uninspected files. No CI runs or debugger configurations were executed; observations describe source definitions, not verified current pass rates.
 
+## Shared-fixture follow-up, 2026-09-09
+
+Checkout's `test-data/*` branches exercise Git-specific behavior. For SOPS, one shared generator of temporary encrypted data and synthetic age identities fits the test boundary; source debugging, workflow assertions, and the real SOPS integration can reuse it. These are project adaptations, not fixture conventions copied from checkout.
+
 ## TypeScript source follow-up, 2026-09-09
 
 The runtime source now uses strict TypeScript while the Node test runner, JavaScript helpers, and ncc delivery bundle remain in place. The explicit compiler check runs through `npm run typecheck`; Node.js 24 executes the same TypeScript source directly for process tests and debugging. ncc includes the runtime npm dependencies in `dist/index.js`, preserving the consumer entrypoint. This extends the current authoring and delivery work; the earlier assessment above remains historical. Source paths in maintained links now resolve to `.ts` files. See the [development contract](../specs/local-action-debugging.md) for migration constraints and verification.

@@ -14,7 +14,7 @@ npm ci --ignore-scripts
 npm run check
 ```
 
-Alternatively, run `direnv allow` once to load the environment on directory entry. `.envrc` also loads an optional, ignored `.env`; [.env.example](../.env.example) documents the optional diagnostic setting. No `.env` file or real credentials are needed for the normal development commands.
+Alternatively, run `direnv allow` once to load the environment on directory entry. `.envrc` also loads an optional, ignored `.env` for local overrides. No environment variables, `.env` file, or real credentials are needed for the normal development commands.
 
 | Command | Purpose |
 | --- | --- |
@@ -31,9 +31,11 @@ Alternatively, run `direnv allow` once to load the environment on directory entr
 | `npm run debug` | Create a disposable fixture and pause the actual source entrypoint in Node Inspector. |
 | `npm run debug:workflow` | Rebuild and execute the synthetic workflow with act. |
 
-The process tests cover source and distribution with the same cases, including malformed documents, required inputs, error sanitization, output encoding, and cache integrity. The real integration test needs network access for its first SOPS download; subsequent checks force offline cache reuse. Test data and keys are synthetic.
+The process tests cover source and distribution with the same cases, including malformed documents, required inputs, error sanitization, output encoding, and cache integrity. The real integration test needs network access for its first SOPS download; subsequent checks force offline cache reuse.
 
 Node.js 24 runs the `.ts` source directly by stripping erasable type syntax; type checking is performed separately by `npm run typecheck`. Relative source imports use explicit `.ts` extensions. The compiler configuration enforces erasable syntax and rewrites relative import extensions for the emitted bundle. Decrypted JSON enters the program as `unknown` and is validated before any decrypted values are masked or published; TypeScript does not replace those runtime checks.
+
+SOPS integration, source debugging, and workflow tests share [integration/fixture.js](../integration/fixture.js). It generates disposable age identities and encrypted synthetic data in private temporary directories. Each caller removes its fixture after use; partial creation is cleaned up by the builder. The mocked SOPS process in the fast tests remains separate because it supplies malformed documents and controlled failures without encryption or downloads.
 
 The test executables and workflow fixture currently use POSIX facilities. Run this development loop on Linux; Windows support requires adapting those fixtures before adding a Windows test matrix.
 
@@ -47,7 +49,7 @@ From the development environment:
 npm run debug
 ```
 
-The command creates a fresh age identity, encrypted JSON, and writable output file in a private temporary directory. It starts `src/index.ts` with Node Inspector paused before execution, using that fixture instead of ambient age credentials.
+The command creates a fresh age identity, encrypted JSON, and writable output file in a private temporary directory. It starts `src/index.ts` with Node Inspector paused before execution, retaining the inherited environment and supplying that fixture through `INPUT_FILE` and `INPUT_KEY`.
 
 Attach your editor's Node.js debugger to `127.0.0.1:9229` and set a breakpoint in `src/main.ts`. VS Code includes the **Attach to SOPS action** configuration in [.vscode/launch.json](../.vscode/launch.json). Continue execution, inspect the values, and disconnect when finished so Node can exit. Ctrl+C stops the child process and removes its fixture.
 
@@ -65,9 +67,11 @@ npm run debug:workflow
 
 npm first rebuilds `dist/`, then `act --local-repository` resolves the [workflow](../integration/workflow.yml)'s `ravecat/load-sops-secrets@local` reference from the current directory, including uncommitted changes. Re-run the command after source edits. The override removes the need for publication or manual copying into another project.
 
-The checkout step makes this project's helper files available in act's runner workspace. The project [.actrc](../.actrc) selects this workflow and maps `ubuntu-24.04` to host execution. The Flake supplies the tools; Docker and GitHub runner registration are not required. Automatic `.env`, `.secrets`, `.input`, and `.vars` file loading by act is disabled. The npm command also removes inherited age-key settings before starting act.
+The checkout step makes this project's helper files available in act's runner workspace. The project [.actrc](../.actrc) selects this workflow and maps `ubuntu-24.04` to host execution. The Flake supplies the tools; Docker and GitHub runner registration are not required. Automatic `.env`, `.secrets`, `.input`, and `.vars` file loading by act is disabled.
 
-The workflow creates a private temporary fixture using [integration/fixture.js](../integration/fixture.js). Only paths are passed between setup and the action. The next step verifies all dynamic outputs, including ordinary, multiline, and empty strings, without printing values. An `always()` step removes the fixture on success or failure. Source debugging and native CI use the same fixture builder.
+The dependency installation step enters the pinned Nix shell using `path:.`, so it uses the required Node.js version without relying on Git metadata in act's copied workspace. Subsequent fixture steps and the action continue to use Node.js 24 from the runner. The workflow installs the pinned npm dependencies for the fixture helper, then creates a private temporary fixture using [integration/fixture.js](../integration/fixture.js). Setup masks the generated multiline identity before publishing it as a same-job step output. The action receives the encrypted file path and identity text through `with.file` and `with.key`. The next step verifies all dynamic outputs, including ordinary, multiline, and empty strings, without printing values. An `always()` step removes the fixture on success or failure.
+
+The default workflow fixture uses LF line endings because [act v0.2.89's output-file parser](https://github.com/nektos/act/blob/v0.2.89/pkg/container/parse_env_file.go) normalizes CRLF to LF. The real SOPS integration supplies a CRLF document to the same generator and checks exact output bytes, including percent signs and quotes. Assertions do not normalize expected values to accommodate the emulator.
 
 This local-only workflow stays outside `.github/workflows/` because GitHub cannot resolve its unpublished `@local` reference. act may report missing Git-ref warnings before a repository's first commit. Its local repository override still supports that development state.
 
@@ -105,7 +109,7 @@ A release must contain `action.yml` and the verified distribution at the Git ref
 - **Debugger does not connect:** confirm port 9229 is free, run `npm run debug`, and attach before continuing execution.
 - **Workflow cannot find the action:** check the exact repository/ref mapping and rebuild in the mapped checkout.
 - **SOPS setup fails:** check platform support, writable runner cache/temp directories, and network access to GitHub releases on a cold cache.
-- **Decryption fails:** check the encrypted file and the credential provider. Use synthetic fixtures for reproductions instead of printing real SOPS diagnostics.
+- **Decryption fails:** check the encrypted file and the age identity supplied through `with.key`. Use synthetic fixtures for reproductions instead of printing real SOPS diagnostics.
 - **GitHub-only failure:** enable `ACTIONS_STEP_DEBUG` or `ACTIONS_RUNNER_DEBUG`, or re-run with debug logging. Extra logs do not provide source breakpoints; avoid printing secrets while collecting diagnostics.
 
 ## References

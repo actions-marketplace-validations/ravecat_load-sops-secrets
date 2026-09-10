@@ -9,7 +9,7 @@ export const secrets = {
   empty: '',
 };
 
-export function createFixture() {
+export function createFixture(values = secrets) {
   const directory = mkdtempSync(join(process.env.RUNNER_TEMP || tmpdir(), 'sops-fixture-'));
   const key = join(directory, 'key.txt');
   const file = join(directory, 'secrets.enc.json');
@@ -21,7 +21,7 @@ export function createFixture() {
     execFileSync('age-keygen', ['-o', key], options);
     const recipient = execFileSync('age-keygen', ['-y', key], options).trim();
     // Node's child stdin is a socket that SOPS cannot reopen through /dev/stdin.
-    writeFileSync(plaintext, JSON.stringify(secrets), { mode: 0o600 });
+    writeFileSync(plaintext, JSON.stringify(values), { mode: 0o600 });
     const encrypted = execFileSync('sops', [
       'encrypt', '--age', recipient, '--input-type', 'json', '--output-type', 'json', plaintext,
     ], options);

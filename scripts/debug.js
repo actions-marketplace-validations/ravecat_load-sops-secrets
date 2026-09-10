@@ -1,16 +1,13 @@
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { rmSync } from 'node:fs';
+import { readFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createFixture } from '../integration/fixture.js';
 
 let fixture;
 try {
   fixture = createFixture();
-  const env = { ...process.env, INPUT_FILE: fixture.file, GITHUB_OUTPUT: fixture.output, SOPS_AGE_KEY_FILE: fixture.key };
-  delete env.SOPS_AGE_KEY;
-  // SOPS treats a present but empty key command as a command to execute.
-  delete env.SOPS_AGE_KEY_CMD;
+  const env = { ...process.env, INPUT_FILE: fixture.file, GITHUB_OUTPUT: fixture.output, INPUT_KEY: readFileSync(fixture.key, 'utf8') };
   const child = spawn(process.execPath, [
     '--inspect-brk=127.0.0.1:9229',
     fileURLToPath(new URL('../src/index.ts', import.meta.url)),
