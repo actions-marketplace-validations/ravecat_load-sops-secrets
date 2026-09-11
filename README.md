@@ -28,6 +28,8 @@ jobs:
         run: test -n "$DEMO_SECRET"
 ```
 
+Reference a release tag such as `@v1` or `@v1.0.0`. The release builds the JavaScript bundle and commits it with the version tag, so branch and commit SHA references contain no `dist/` and fail at runtime.
+
 This action currently supports only SOPS-encrypted files that decrypt to a flat JSON object with string values, for example:
 
 ```json

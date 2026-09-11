@@ -26,6 +26,9 @@ jobs:
       - name: Cache Nix store
         uses: DeterminateSystems/magic-nix-cache-action@v13
       - run: npm ci --ignore-scripts
+      # Workflow validation resolves the local action entrypoint produced by this build.
+      - name: Build action bundle
+        run: npm run build
       - name: Lint workflows
         run: npm run lint:workflows
       - name: Type check
@@ -97,6 +100,9 @@ jobs:
       - run: npm ci --ignore-scripts
       - name: Build release bundle
         run: npm run build
+      # The release must not ship an incomplete bundle.
+      - name: Verify release bundle
+        run: test -s dist/index.js && test -s dist/package.json && test -s dist/licenses.txt
       - name: Preview semantic release
         if: github.event_name == 'push'
         run: npm run release -- --branches "$RELEASE_BRANCH" --dry-run
