@@ -4,7 +4,7 @@ import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } f
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, test as base } from 'vitest';
-import { create, secrets as fixtureSecrets } from './fixture.ts';
+import { create, createKey, secrets as fixtureSecrets } from './fixture.ts';
 
 const secrets = { ...fixtureSecrets, multiline: 'first%line\r\nsecond "quoted" line' };
 const source = fileURLToPath(new URL('../../src/index.ts', import.meta.url));
@@ -58,13 +58,6 @@ const test = base.extend('fixture', ({}, { onCleanup }) => {
   const fixture = prepare();
   onCleanup(() => rmSync(fixture.directory, { recursive: true, force: true }));
   return fixture;
-}).extend('wrongIdentity', () => {
-  const fixture = create();
-  try {
-    return readFileSync(fixture.key, 'utf8');
-  } finally {
-    rmSync(fixture.directory, { recursive: true, force: true });
-  }
 });
 
 describe('SOPS Integration', () => {
@@ -109,10 +102,11 @@ describe('SOPS Integration', () => {
     }
   });
 
-  test('keeps keys and secrets out of visible logs', ({ fixture, wrongIdentity }) => {
+  test('keeps keys and secrets out of visible logs', ({ fixture }) => {
+    const wrongKey = createKey();
     const bundled = fixture.run(fixture.bundle);
     const sourced = fixture.run(source);
-    const failed = fixture.run(fixture.bundle, { INPUT_KEY: wrongIdentity });
+    const failed = fixture.run(fixture.bundle, { INPUT_KEY: wrongKey });
 
     assert.equal(bundled.status, 0);
     assert.equal(sourced.status, 0);
@@ -129,10 +123,11 @@ describe('SOPS Integration', () => {
     }
   });
 
-  test('cleans up temporary downloads', ({ fixture, wrongIdentity }) => {
+  test('cleans up temporary downloads', ({ fixture }) => {
+    const wrongKey = createKey();
     const installed = fixture.run(fixture.bundle, { PATH: '' });
     const cached = fixture.run(source, offline);
-    const failed = fixture.run(fixture.bundle, { ...offline, INPUT_KEY: wrongIdentity });
+    const failed = fixture.run(fixture.bundle, { ...offline, INPUT_KEY: wrongKey });
 
     assert.equal(installed.status, 0);
     assert.equal(cached.status, 0);
@@ -143,14 +138,15 @@ describe('SOPS Integration', () => {
     }
   });
 
-  test('rejects a wrong INPUT_KEY despite a correct ambient SOPS_AGE_KEY', ({ fixture, wrongIdentity }) => {
-    const failed = fixture.run(fixture.bundle, { INPUT_KEY: wrongIdentity });
+  test('rejects a wrong INPUT_KEY despite a correct ambient SOPS_AGE_KEY', ({ fixture }) => {
+    const wrongKey = createKey();
+    const failed = fixture.run(fixture.bundle, { INPUT_KEY: wrongKey });
 
     assert.equal(failed.error, undefined);
     assert.equal(failed.status, 1);
     assert.equal(failed.output, '');
     assert.ok(failed.stdout.includes('::error::SOPS decryption failed. Check the file and decryption key.'));
-    const mask = wrongIdentity.trim().replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
+    const mask = wrongKey.trim().replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
     assert.ok(failed.stdout.includes(`::add-mask::${mask}\n`));
     assert.equal(failed.stdout.split('\n').filter(line => line.startsWith('::add-mask::')).length, 1);
   });

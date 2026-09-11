@@ -13,6 +13,16 @@ export const secrets = {
   'ключ': 'unicode-example-value',
 };
 
+export function createKey(): string {
+  try {
+    return execFileSync('age-keygen', [], {
+      env: { PATH: process.env.PATH }, encoding: 'utf8', timeout: 10_000, stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch {
+    throw new Error('Could not create a synthetic age key. Check that age is available.');
+  }
+}
+
 export function create(values: Record<string, string> = secrets) {
   const directory = mkdtempSync(join(process.env.RUNNER_TEMP || tmpdir(), 'sops-fixture-'));
   const key = join(directory, 'key.txt');
@@ -22,7 +32,7 @@ export function create(values: Record<string, string> = secrets) {
   const options: ExecFileSyncOptionsWithStringEncoding = { env: { PATH: process.env.PATH }, encoding: 'utf8', timeout: 10_000, stdio: ['pipe', 'pipe', 'pipe'] };
 
   try {
-    execFileSync('age-keygen', ['-o', key], options);
+    writeFileSync(key, createKey(), { mode: 0o600 });
     const recipient = execFileSync('age-keygen', ['-y', key], options).trim();
     // Node's child stdin is a socket that SOPS cannot reopen through /dev/stdin.
     writeFileSync(plaintext, JSON.stringify(values), { mode: 0o600 });
