@@ -6,9 +6,13 @@ export default [
   { ignores: ['dist/**'] },
   js.configs.recommended,
   {
-    files: ['src/**/*.ts', 'tests/**/*.ts'],
+    files: ['src/**/*.ts', 'tests/**/*.ts', 'vitest.config.ts'],
     languageOptions: { parser: tsParser },
     rules: { 'no-undef': 'off' },
+  },
+  {
+    files: ['tests/integration/*.test.ts'],
+    rules: { 'no-empty-pattern': ['error', { allowObjectPatternsAsParameters: true }] },
   },
   { languageOptions: { globals: globals.node } },
 ];

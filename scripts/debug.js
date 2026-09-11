@@ -2,11 +2,11 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { readFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { createFixture } from '../tests/integration/fixture.ts';
+import { create } from '../tests/integration/fixture.ts';
 
 let fixture;
 try {
-  fixture = createFixture();
+  fixture = create();
   const env = { ...process.env, INPUT_FILE: fixture.file, GITHUB_OUTPUT: fixture.output, INPUT_KEY: readFileSync(fixture.key, 'utf8') };
   const child = spawn(process.execPath, [
     '--inspect-brk=127.0.0.1:9229',

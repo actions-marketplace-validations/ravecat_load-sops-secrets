@@ -4,7 +4,7 @@
 
 The [Flake](../flake.nix) provides Node.js 24.16.0 with npm, Git, SOPS, age, `act`, `actionlint`, and `markdownlint-cli2`. Local development and GitHub CI use the same `flake.lock`; JavaScript dependencies are pinned in `package-lock.json`. Development tooling requires Node.js 24.15.0 or newer; the action metadata continues to select the GitHub Node.js 24 runtime.
 
-Runtime source under `src/` and tests and fixtures under `tests/` use strict TypeScript. TypeScript 6.0.3 is pinned for compatibility with ncc 0.45 and the ESLint TypeScript parser; TypeScript 7 changes the compiler API used by these tools. `tsc --noEmit` checks source, test, and fixture types, while ncc compiles and bundles the action and its npm dependencies into the ready-to-run `dist/index.js`. Debug and release scripts remain JavaScript.
+Runtime source under `src/` and tests and fixtures under `tests/` use strict TypeScript. Vitest 4.1.11 is pinned for compatibility with these strict settings; Vitest 5.0.0 has incompatible dependency declarations. TypeScript 6.0.3 is pinned for compatibility with ncc 0.45 and the ESLint TypeScript parser; TypeScript 7 changes the compiler API used by these tools. `tsc --noEmit` checks source, test, and fixture types, while ncc compiles and bundles the action and its npm dependencies into the ready-to-run `dist/index.js`. Debug and release scripts remain JavaScript.
 
 With Nix and flakes enabled, run from this project's directory:
 
@@ -21,7 +21,7 @@ Alternatively, run `direnv allow` once to load the environment on directory entr
 | `npm run typecheck` | Check runtime, test, and fixture TypeScript with strict compiler settings without emitting files. |
 | `npm run build` | Compile TypeScript and bundle npm dependencies into `dist/`. |
 | `npm test` | Check source and bundle behavior without network access. Build first. |
-| `npm run test:integration` | Exercise real SOPS download, decryption, offline cache reuse, and a wrong key. Build first. |
+| `npm run test:integration` | Use Vitest to exercise real SOPS download, decryption, offline cache reuse, and a wrong key. Build first. |
 | `npm run lint` | Run workflow, source, and documentation lint. |
 | `npm run lint:workflows` | Validate GitHub CI and the local workflow with actionlint. |
 | `npm run lint:js` | Check TypeScript source, tests, fixtures, and JavaScript scripts and configuration with ESLint. |
@@ -30,9 +30,11 @@ Alternatively, run `direnv allow` once to load the environment on directory entr
 | `npm run debug` | Create a disposable fixture and pause the actual source entrypoint in Node Inspector. |
 | `npm run debug:workflow` | Rebuild and execute the synthetic workflow with act. |
 
-The process tests cover source and distribution with the same cases, including malformed documents, required inputs, error sanitization, output encoding, and cache integrity. The real integration suite reports installation, offline cache reuse, output preservation, log secrecy, temporary-download cleanup, and wrong-key handling as named tests. Shared preparation needs network access for one SOPS download; subsequent action runs force offline cache reuse. Each test checks a captured result without depending on another test having run or passed.
+The process tests cover source and distribution with the same cases, including malformed documents, required inputs, error sanitization, output encoding, and cache integrity. The real integration suite reports installation, offline cache reuse, output preservation, log secrecy, temporary-download cleanup, and wrong-key handling as named tests. Vitest's `test.extend` supplies each test with its own typed fixture context, including an isolated directory and tool cache. Each test runs the action in its body. The `prepare` helper removes partial setup on failure. Once preparation succeeds, `onCleanup` removes the environment after the test, including after a failed assertion.
 
-Test files use the `.test.ts` suffix. `npm test` selects only `tests/*.test.ts`; `npm run test:integration` selects only `tests/integration/*.test.ts`. Fixtures and workflow scripts have no `.test` suffix and are not discovered as tests:
+The installation, cache-reuse, and download-cleanup scenarios each perform their own download, requiring network access for three SOPS downloads per full run. The cache scenario installs through the bundle before invoking source with an unavailable download proxy. Other scenarios use SOPS from the development environment. Any scenario can run independently, for example `npm run test:integration -- -t 'reuses cached SOPS offline'`.
+
+Test files use the `.test.ts` suffix. `npm test` uses the Node.js test runner and selects only `tests/*.test.ts`; `npm run test:integration` uses [vitest.config.ts](../vitest.config.ts) to select only `tests/integration/*.test.ts`. Fixtures and workflow scripts have no `.test` suffix and are not discovered as tests:
 
 ```text
 tests/
@@ -47,7 +49,7 @@ tests/
 
 Node.js 24 runs the `.ts` source directly by stripping erasable type syntax; type checking is performed separately by `npm run typecheck`. Relative source imports use explicit `.ts` extensions. The compiler configuration enforces erasable syntax and rewrites relative import extensions for the emitted bundle. Decrypted JSON enters the program as `unknown` and is validated before any decrypted values are masked or published; TypeScript does not replace those runtime checks.
 
-SOPS integration, source debugging, and workflow tests share [tests/integration/fixture.ts](../tests/integration/fixture.ts). It generates disposable age identities and encrypted synthetic data in private temporary directories. Each caller removes its fixture after use; partial creation is cleaned up by the builder. The mocked SOPS process in the fast tests remains separate because it supplies malformed documents and controlled failures without encryption or downloads.
+SOPS integration, source debugging, and workflow tests share the `create` function in [tests/integration/fixture.ts](../tests/integration/fixture.ts). It generates disposable age identities and encrypted synthetic data in private temporary directories without depending on Vitest. Each caller removes its fixture after use; partial creation is cleaned up by the builder. Integration tests register cleanup with Vitest, and an additional identity is created lazily only for tests that request `wrongIdentity`. The mocked SOPS process in the fast tests remains separate because it supplies malformed documents and controlled failures without encryption or downloads.
 
 The test executables and workflow fixture currently use POSIX facilities. Run this development loop on Linux; Windows support requires adapting those fixtures before adding a Windows test matrix.
 
@@ -131,6 +133,7 @@ The native action step uses GitHub's Node.js 24 runtime. The custom Nix shell ap
 - [GitHub debug logging](https://docs.github.com/en/actions/how-tos/monitor-workflows/enable-debug-logging)
 - [Node.js Inspector](https://nodejs.org/docs/latest-v24.x/api/debugger.html#v8-inspector-integration-for-nodejs)
 - [Node.js TypeScript support](https://nodejs.org/docs/latest-v24.x/api/typescript.html)
+- [Vitest fixture context and cleanup](https://v4.vitest.dev/guide/test-context)
 - [ncc TypeScript support](https://github.com/vercel/ncc#with-typescript)
 - [TypeScript compiler API compatibility](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6-0)
 - [SOPS 3.13.1 release](https://github.com/getsops/sops/releases/tag/v3.13.1)

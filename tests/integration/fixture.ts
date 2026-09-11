@@ -13,7 +13,7 @@ export const secrets = {
   'ключ': 'unicode-example-value',
 };
 
-export function createFixture(values: Record<string, string> = secrets) {
+export function create(values: Record<string, string> = secrets) {
   const directory = mkdtempSync(join(process.env.RUNNER_TEMP || tmpdir(), 'sops-fixture-'));
   const key = join(directory, 'key.txt');
   const file = join(directory, 'secrets.enc.json');

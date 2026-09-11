@@ -1,8 +1,8 @@
 import * as core from '@actions/core';
 import { readFileSync, rmSync } from 'node:fs';
-import { createFixture } from './fixture.ts';
+import { create } from './fixture.ts';
 
-const fixture = createFixture();
+const fixture = create();
 try {
   const key = readFileSync(fixture.key, 'utf8').trim();
   core.setSecret(key);
