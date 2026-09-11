@@ -1,5 +1,7 @@
 # load-sops-secrets
 
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Load%20SOPS%20secrets-blue?logo=github)](https://github.com/marketplace/actions/load-sops-secrets) [![Latest release](https://img.shields.io/github/v/release/ravecat/load-sops-secrets?sort=semver)](https://github.com/ravecat/load-sops-secrets/releases) [![CI](https://github.com/ravecat/load-sops-secrets/actions/workflows/ci.yml/badge.svg)](https://github.com/ravecat/load-sops-secrets/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/ravecat/load-sops-secrets)](LICENSE)
+
 Decrypt a SOPS-encrypted JSON file and expose its values as masked GitHub Actions step outputs.
 
 ## Usage
