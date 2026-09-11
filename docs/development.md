@@ -30,7 +30,7 @@ Alternatively, run `direnv allow` once to load the environment on directory entr
 | `npm run debug` | Create a disposable fixture and pause the actual source entrypoint in Node Inspector. |
 | `npm run debug:workflow` | Rebuild and execute the synthetic workflow with act. |
 
-The process tests cover source and distribution with the same cases, including malformed documents, required inputs, error sanitization, output encoding, and cache integrity. The real integration test needs network access for its first SOPS download; subsequent checks force offline cache reuse.
+The process tests cover source and distribution with the same cases, including malformed documents, required inputs, error sanitization, output encoding, and cache integrity. The real integration suite reports installation, offline cache reuse, output preservation, log secrecy, temporary-download cleanup, and wrong-key handling as named tests. Shared preparation needs network access for one SOPS download; subsequent action runs force offline cache reuse. Each test checks a captured result without depending on another test having run or passed.
 
 Node.js 24 runs the `.ts` source directly by stripping erasable type syntax; type checking is performed separately by `npm run typecheck`. Relative source imports use explicit `.ts` extensions. The compiler configuration enforces erasable syntax and rewrites relative import extensions for the emitted bundle. Decrypted JSON enters the program as `unknown` and is validated before any decrypted values are masked or published; TypeScript does not replace those runtime checks.
 

@@ -17,6 +17,7 @@ This specification owns the project's development interface, including migration
 - `npm run debug` creates disposable synthetic credentials and input/output files, pauses `src/index.ts` with Node Inspector on loopback, suppresses action stdout, and cleans its fixture after normal exit, failure, or handled interruption. The editor attaches to the actual TypeScript source process without Toolkit stubs.
 - One shared fixture builder supplies source debugging, local and GitHub workflow tests, and real-SOPS integration. It uses a private temporary directory, age identity, and encrypted JSON with ordinary, multiline, and empty values, plus dotted, spaced, numeric-leading, and Unicode keys. Partial fixture creation is cleaned up, and each caller owns final cleanup. Real-download integration retains cold installation, offline cache reuse, and wrong-key coverage. Mocked process fixtures remain separate for controlled parsing and failure scenarios.
 - The generator accepts caller-provided document values. The workflow smoke case uses LF for act compatibility, while real-SOPS integration checks CRLF, percent signs, and quotes without normalizing its output assertions.
+- Real-SOPS integration reports installation, offline cache reuse, output preservation, log secrecy, temporary-download cleanup, and wrong-key handling as named tests. Shared preparation performs one download and captures the action runs; assertions remain in the relevant tests, with no test depending on another test having run or passed.
 - `npm run debug:workflow` rebuilds and runs `integration/workflow.yml` through `act --local-repository`, mapping `ravecat/load-sops-secrets@local` to the current checkout. `.actrc` retains host execution and disables implicit local credential-file loading.
 - Native CI invokes `uses: ./` and verifies outputs in a later step. The local workflow retains its external-reference override to exercise the sibling-consumer development pattern. Both workflows use the shared fixture and assertion scripts, and clean fixtures with `always()`.
 - One CI workflow owns inline `lint`, `test`, and `release` jobs. Branch pushes, pull requests, and manual dispatches run lint and test in parallel without reusable workflows or routing inputs. Release requires both checks to succeed before building its own distribution bundle. Tag pushes do not trigger CI.
@@ -85,7 +86,13 @@ Debug-environment simplification verification on Linux x64 on 2026-09-11:
 - Removed inherited age-variable cleanup from both debug entrypoints. `nix develop --command npm run lint` passed, and `nix develop --command npm run debug:workflow` passed the direct act invocation, distribution build, fixture setup, dynamic-output assertions, and cleanup.
 - An Inspector smoke check resumed `scripts/debug.js` and verified exit code zero, suppressed stdout, and fixture cleanup. No inherited age variables were present or artificially injected; the earlier invalid-environment smoke result describes the preceding implementation.
 
-This specification accompanies the local completion commits for TypeScript authoring, the required key input, output-key passthrough, and CI/release configuration. The earlier verification results describe the preceding TypeScript, key-input, and separate-workflow changes.
+Integration-test reporting verification on Linux x64 on 2026-09-11:
+
+- Split the real-SOPS integration into nine named tests, preserving all previous assertions and three action runs with one cold download. Setup captures results without assertions; tests do not depend on another test having run or passed.
+- `nix develop --command npm run test:integration` passed all nine tests on `master`. `nix develop --command node --test --test-name-pattern='reuses cached SOPS' integration/sops.js` passed the cache-reuse test in isolation, including shared preparation.
+- `nix develop --command npm run lint:js`, `nix develop --command npm run lint:docs`, and `git diff --check` passed. Diff review found no coverage regressions. Runtime source and workflows were unchanged; no GitHub-hosted run was performed.
+
+This specification accompanies the local completion commits for TypeScript authoring, the required key input, output-key passthrough, CI/release configuration, and integration-test reporting. The earlier verification results describe the preceding TypeScript, key-input, and separate-workflow changes.
 
 ## Rollback
 
