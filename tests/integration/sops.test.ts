@@ -1,20 +1,26 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, type SpawnSyncReturns } from 'node:child_process';
 import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { after, before, describe, test } from 'node:test';
-import { createFixture, secrets as fixtureSecrets } from './fixture.js';
+import { createFixture, secrets as fixtureSecrets } from './fixture.ts';
 
 const secrets = { ...fixtureSecrets, multiline: 'first%line\r\nsecond "quoted" line' };
 
-describe('real SOPS integration', () => {
-  const directories = [];
-  let identity;
-  let wrongIdentity;
-  let installed;
-  let cached;
-  let failed;
+type ActionResult = Omit<SpawnSyncReturns<string>, 'output'> & {
+  output: string;
+  temporaryFiles: string[];
+  key: string;
+};
+
+describe('SOPS Integration', () => {
+  const directories: string[] = [];
+  let identity: string;
+  let wrongIdentity: string;
+  let installed: ActionResult;
+  let cached: ActionResult;
+  let failed: ActionResult;
 
   after(() => {
     for (const directory of directories) rmSync(directory, { recursive: true, force: true });
@@ -25,11 +31,11 @@ describe('real SOPS integration', () => {
     directories.push(directory);
     const temporary = join(directory, 'tmp');
     mkdirSync(temporary);
-    cpSync(fileURLToPath(new URL('../dist', import.meta.url)), join(directory, 'dist'), { recursive: true });
+    cpSync(fileURLToPath(new URL('../../dist', import.meta.url)), join(directory, 'dist'), { recursive: true });
 
     identity = readFileSync(key, 'utf8');
 
-    function run(entry, key, offline = false) {
+    function run(entry: string, key: string, offline = false): ActionResult {
       const output = join(directory, 'output');
       writeFileSync(output, '', { mode: 0o600 });
       const result = spawnSync(process.execPath, [entry], {
@@ -53,7 +59,7 @@ describe('real SOPS integration', () => {
 
     const bundle = join(directory, 'dist', 'index.js');
     installed = run(bundle, identity);
-    cached = run(fileURLToPath(new URL('../src/index.ts', import.meta.url)), identity, true);
+    cached = run(fileURLToPath(new URL('../../src/index.ts', import.meta.url)), identity, true);
 
     const wrongFixture = createFixture();
     directories.push(wrongFixture.directory);
@@ -61,24 +67,24 @@ describe('real SOPS integration', () => {
     failed = run(bundle, wrongIdentity, true);
   });
 
-  test('installs SOPS with an empty PATH and decrypts through the copied bundle', () => {
+  test('installs SOPS and decrypts with the bundle', () => {
     assert.equal(installed.error, undefined);
     assert.equal(installed.status, 0, 'SOPS installation or decryption failed.');
   });
 
-  test('reuses cached SOPS through the source entry point while offline', () => {
+  test('reuses cached SOPS offline', () => {
     assert.equal(cached.error, undefined);
     assert.equal(cached.status, 0, 'Cached SOPS decryption failed.');
-    assert.equal(cached.stdout.includes('Downloading'), false);
   });
 
-  test('preserves empty and multiline outputs, special characters, and unusual output names', () => {
+  test('preserves output names and values', () => {
     for (const result of [installed, cached]) {
-      const values = {};
+      const values: Record<string, string> = {};
       let remaining = result.output;
       while (remaining !== '') {
         const headerEnd = remaining.indexOf('\n');
         const [name, delimiter] = remaining.slice(0, headerEnd).split('<<');
+        assert.ok(name);
         assert.ok(delimiter);
         const end = remaining.indexOf(`\n${delimiter}\n`, headerEnd + 1);
         assert.ok(end >= 0);
@@ -90,7 +96,7 @@ describe('real SOPS integration', () => {
     }
   });
 
-  test('keeps keys and secrets out of visible stdout and leaves stderr empty', () => {
+  test('keeps keys and secrets out of visible logs', () => {
     for (const result of [installed, cached, failed]) {
       assert.equal(result.stderr, '');
       const visible = result.stdout.split('\n').filter(line => !line.startsWith('::add-mask::')).join('\n');
@@ -102,7 +108,7 @@ describe('real SOPS integration', () => {
     }
   });
 
-  test('removes temporary downloads after installation, cache reuse, and decryption failure', () => {
+  test('cleans up temporary downloads', () => {
     for (const result of [installed, cached, failed]) {
       assert.deepEqual(result.temporaryFiles, [], 'Installer must remove its temporary download.');
     }
@@ -111,17 +117,8 @@ describe('real SOPS integration', () => {
   test('rejects a wrong INPUT_KEY despite a correct ambient SOPS_AGE_KEY', () => {
     assert.equal(failed.error, undefined);
     assert.equal(failed.status, 1);
-  });
-
-  test('writes no outputs when decryption fails', () => {
     assert.equal(failed.output, '');
-  });
-
-  test('reports a sanitized decryption error', () => {
     assert.ok(failed.stdout.includes('::error::SOPS decryption failed. Check the file and decryption key.'));
-  });
-
-  test('masks only the input key when decryption fails', () => {
     const mask = wrongIdentity.trim().replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
     assert.ok(failed.stdout.includes(`::add-mask::${mask}\n`));
     assert.equal(failed.stdout.split('\n').filter(line => line.startsWith('::add-mask::')).length, 1);

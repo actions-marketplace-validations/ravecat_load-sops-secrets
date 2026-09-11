@@ -53,7 +53,7 @@ jobs:
         run: npm run test:integration
       - name: Prepare synthetic fixture
         id: fixture
-        run: node integration/prepare.js
+        run: node tests/integration/prepare.ts
       - name: Load secrets through the action metadata
         id: sops
         uses: ./
@@ -65,7 +65,7 @@ jobs:
           DEMO_SECRET: ${{ steps.sops.outputs.demo_secret }}
           MULTILINE: ${{ steps.sops.outputs.multiline }}
           ALL_OUTPUTS: ${{ toJSON(steps.sops.outputs) }}
-        run: node integration/verify.js
+        run: node tests/integration/verify.ts
       - name: Remove synthetic fixture
         if: ${{ always() && steps.fixture.outputs.directory != '' }}
         env:

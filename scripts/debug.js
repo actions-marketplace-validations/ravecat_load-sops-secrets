@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { readFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { createFixture } from '../integration/fixture.js';
+import { createFixture } from '../tests/integration/fixture.ts';
 
 let fixture;
 try {

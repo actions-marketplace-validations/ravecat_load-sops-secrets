@@ -4,7 +4,7 @@
 
 The [Flake](../flake.nix) provides Node.js 24.16.0 with npm, Git, SOPS, age, `act`, `actionlint`, and `markdownlint-cli2`. Local development and GitHub CI use the same `flake.lock`; JavaScript dependencies are pinned in `package-lock.json`. Development tooling requires Node.js 24.15.0 or newer; the action metadata continues to select the GitHub Node.js 24 runtime.
 
-Runtime source under `src/` uses strict TypeScript. TypeScript 6.0.3 is pinned for compatibility with ncc 0.45 and the ESLint TypeScript parser; TypeScript 7 changes the compiler API used by these tools. `tsc --noEmit` checks source types, while ncc compiles and bundles npm dependencies into the ready-to-run `dist/index.js`. Test helpers and release configuration remain JavaScript.
+Runtime source under `src/` and tests and fixtures under `tests/` use strict TypeScript. TypeScript 6.0.3 is pinned for compatibility with ncc 0.45 and the ESLint TypeScript parser; TypeScript 7 changes the compiler API used by these tools. `tsc --noEmit` checks source, test, and fixture types, while ncc compiles and bundles the action and its npm dependencies into the ready-to-run `dist/index.js`. Debug and release scripts remain JavaScript.
 
 With Nix and flakes enabled, run from this project's directory:
 
@@ -18,13 +18,13 @@ Alternatively, run `direnv allow` once to load the environment on directory entr
 
 | Command | Purpose |
 | --- | --- |
-| `npm run typecheck` | Check runtime TypeScript with strict compiler settings without emitting files. |
+| `npm run typecheck` | Check runtime, test, and fixture TypeScript with strict compiler settings without emitting files. |
 | `npm run build` | Compile TypeScript and bundle npm dependencies into `dist/`. |
 | `npm test` | Check source and bundle behavior without network access. Build first. |
 | `npm run test:integration` | Exercise real SOPS download, decryption, offline cache reuse, and a wrong key. Build first. |
 | `npm run lint` | Run workflow, source, and documentation lint. |
 | `npm run lint:workflows` | Validate GitHub CI and the local workflow with actionlint. |
-| `npm run lint:js` | Check TypeScript source and JavaScript helpers and configuration with ESLint. |
+| `npm run lint:js` | Check TypeScript source, tests, fixtures, and JavaScript scripts and configuration with ESLint. |
 | `npm run lint:docs` | Check README and documentation Markdown. |
 | `npm run check` | Check types, build, lint, and run action and SOPS tests. |
 | `npm run debug` | Create a disposable fixture and pause the actual source entrypoint in Node Inspector. |
@@ -32,9 +32,22 @@ Alternatively, run `direnv allow` once to load the environment on directory entr
 
 The process tests cover source and distribution with the same cases, including malformed documents, required inputs, error sanitization, output encoding, and cache integrity. The real integration suite reports installation, offline cache reuse, output preservation, log secrecy, temporary-download cleanup, and wrong-key handling as named tests. Shared preparation needs network access for one SOPS download; subsequent action runs force offline cache reuse. Each test checks a captured result without depending on another test having run or passed.
 
+Test files use the `.test.ts` suffix. `npm test` selects only `tests/*.test.ts`; `npm run test:integration` selects only `tests/integration/*.test.ts`. Fixtures and workflow scripts have no `.test` suffix and are not discovered as tests:
+
+```text
+tests/
+  index.test.ts
+  integration/
+    sops.test.ts
+    fixture.ts
+    prepare.ts
+    verify.ts
+    workflow.yml
+```
+
 Node.js 24 runs the `.ts` source directly by stripping erasable type syntax; type checking is performed separately by `npm run typecheck`. Relative source imports use explicit `.ts` extensions. The compiler configuration enforces erasable syntax and rewrites relative import extensions for the emitted bundle. Decrypted JSON enters the program as `unknown` and is validated before any decrypted values are masked or published; TypeScript does not replace those runtime checks.
 
-SOPS integration, source debugging, and workflow tests share [integration/fixture.js](../integration/fixture.js). It generates disposable age identities and encrypted synthetic data in private temporary directories. Each caller removes its fixture after use; partial creation is cleaned up by the builder. The mocked SOPS process in the fast tests remains separate because it supplies malformed documents and controlled failures without encryption or downloads.
+SOPS integration, source debugging, and workflow tests share [tests/integration/fixture.ts](../tests/integration/fixture.ts). It generates disposable age identities and encrypted synthetic data in private temporary directories. Each caller removes its fixture after use; partial creation is cleaned up by the builder. The mocked SOPS process in the fast tests remains separate because it supplies malformed documents and controlled failures without encryption or downloads.
 
 The test executables and workflow fixture currently use POSIX facilities. Run this development loop on Linux; Windows support requires adapting those fixtures before adding a Windows test matrix.
 
@@ -64,11 +77,11 @@ From the development environment:
 npm run debug:workflow
 ```
 
-npm first rebuilds `dist/`, then `act --local-repository` resolves the [workflow](../integration/workflow.yml)'s `ravecat/load-sops-secrets@local` reference from the current directory, including uncommitted changes. Re-run the command after source edits. The override removes the need for publication or manual copying into another project.
+npm first rebuilds `dist/`, then `act --local-repository` resolves the [workflow](../tests/integration/workflow.yml)'s `ravecat/load-sops-secrets@local` reference from the current directory, including uncommitted changes. Re-run the command after source edits. The override removes the need for publication or manual copying into another project.
 
 The checkout step makes this project's helper files available in act's runner workspace. The project [.actrc](../.actrc) selects this workflow and maps `ubuntu-24.04` to host execution. The Flake supplies the tools; Docker and GitHub runner registration are not required. Automatic `.env`, `.secrets`, `.input`, and `.vars` file loading by act is disabled.
 
-The dependency installation step enters the pinned Nix shell using `path:.`, so it uses the required Node.js version without relying on Git metadata in act's copied workspace. Subsequent fixture steps and the action continue to use Node.js 24 from the runner. The workflow installs the pinned npm dependencies for the fixture helper, then creates a private temporary fixture using [integration/fixture.js](../integration/fixture.js). Setup masks the generated multiline identity before publishing it as a same-job step output. The action receives the encrypted file path and identity text through `with.file` and `with.key`. The next step verifies all dynamic outputs, including ordinary, multiline, and empty strings, without printing values. An `always()` step removes the fixture on success or failure.
+The dependency installation step enters the pinned Nix shell using `path:.`, so it uses the required Node.js version without relying on Git metadata in act's copied workspace. Subsequent fixture steps and the action continue to use Node.js 24 from the runner. The workflow installs the pinned npm dependencies for the fixture helper, then creates a private temporary fixture using [tests/integration/fixture.ts](../tests/integration/fixture.ts). Setup masks the generated multiline identity before publishing it as a same-job step output. The action receives the encrypted file path and identity text through `with.file` and `with.key`. The next step verifies all dynamic outputs, including ordinary, multiline, and empty strings, without printing values. An `always()` step removes the fixture on success or failure.
 
 The default workflow fixture uses LF line endings because [act v0.2.89's output-file parser](https://github.com/nektos/act/blob/v0.2.89/pkg/container/parse_env_file.go) normalizes CRLF to LF. The real SOPS integration supplies a CRLF document to the same generator and checks exact output bytes, including percent signs and quotes. Assertions do not normalize expected values to accommodate the emulator.
 

@@ -63,7 +63,7 @@ Recommendation: keep direct Node Inspector as the default source debugger; an ed
 
 act supports host execution via a runner mapping to `-self-hosted`; this does not require installing or registering a GitHub self-hosted runner. Its documented limitations include ignored permissions and concurrency, incomplete context, and missing OIDC endpoint support. A successful act run therefore cannot certify permission or cloud OIDC behavior. Sources: [act runner modes](https://nektosact.com/usage/runners.html), [unsupported functionality](https://nektosact.com/not_supported.html).
 
-The project's `.actrc` uses host execution and disables implicit loading of local env/secret/input/variable files. Its local workflow generates a fresh age identity and synthetic encrypted data, then checks ordinary, multiline, and empty outputs. This is well aligned with a fast local workflow check. Sources: [act configuration](../../.actrc), [local workflow](../../integration/workflow.yml), [development guide](../../docs/development.md).
+The project's `.actrc` uses host execution and disables implicit loading of local env/secret/input/variable files. Its local workflow generates a fresh age identity and synthetic encrypted data, then checks ordinary, multiline, and empty outputs. This is well aligned with a fast local workflow check. Sources: [act configuration](../../.actrc), [local workflow](../../tests/integration/workflow.yml), [development guide](../../docs/development.md).
 
 For diagnosing actual GitHub runs, document ACTIONS_STEP_DEBUG and ACTIONS_RUNNER_DEBUG or the debug rerun option. These provide additional logs, not source breakpoints. Source: [Enabling debug logging](https://docs.github.com/en/actions/how-tos/monitor-workflows/enable-debug-logging).
 
@@ -82,7 +82,7 @@ For diagnosing actual GitHub runs, document ACTIONS_STEP_DEBUG and ACTIONS_RUNNE
 | Documentation checks | No dedicated Markdown, link, metadata-to-README, or documented-example check appears in current scripts or CI | Start with one consumer example exercised as a workflow; use formatting/link checks where useful; avoid generating a large docs framework for a single input |
 | Local breakpoints | `node --inspect-brk src/index.js`, with environment and output-file setup documented | Make launch and fixture setup repeatable if this is a frequent workflow |
 
-Local evidence: [README](../../README.md), [package scripts](../../package.json), [CI](../../.github/workflows/ci.yml), [process tests](../../test/index.test.js), [SOPS integration test](../../integration/sops.js), [installer](../../src/sops.ts). These links point to maintained files; the table describes the earlier research snapshot.
+Local evidence: [README](../../README.md), [package scripts](../../package.json), [CI](../../.github/workflows/ci.yml), [process tests](../../tests/index.test.ts), [SOPS integration test](../../tests/integration/sops.test.ts), [installer](../../src/sops.ts). These links point to maintained files; the table describes the earlier research snapshot.
 
 ## Recommended documentation boundary
 

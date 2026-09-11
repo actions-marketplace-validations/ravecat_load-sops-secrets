@@ -6,7 +6,7 @@ export default [
   { ignores: ['dist/**'] },
   js.configs.recommended,
   {
-    files: ['src/**/*.ts'],
+    files: ['src/**/*.ts', 'tests/**/*.ts'],
     languageOptions: { parser: tsParser },
     rules: { 'no-undef': 'off' },
   },

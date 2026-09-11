@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, type ExecFileSyncOptionsWithStringEncoding } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -13,13 +13,13 @@ export const secrets = {
   'ключ': 'unicode-example-value',
 };
 
-export function createFixture(values = secrets) {
+export function createFixture(values: Record<string, string> = secrets) {
   const directory = mkdtempSync(join(process.env.RUNNER_TEMP || tmpdir(), 'sops-fixture-'));
   const key = join(directory, 'key.txt');
   const file = join(directory, 'secrets.enc.json');
   const output = join(directory, 'output');
   const plaintext = join(directory, 'fixture.json');
-  const options = { env: { PATH: process.env.PATH }, encoding: 'utf8', timeout: 10_000, stdio: ['pipe', 'pipe', 'pipe'] };
+  const options: ExecFileSyncOptionsWithStringEncoding = { env: { PATH: process.env.PATH }, encoding: 'utf8', timeout: 10_000, stdio: ['pipe', 'pipe', 'pipe'] };
 
   try {
     execFileSync('age-keygen', ['-o', key], options);

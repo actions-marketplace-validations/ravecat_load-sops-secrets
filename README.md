@@ -70,7 +70,7 @@ Setup, decryption, invalid-document, and output-write failures fail the step wit
 
 ## Development
 
-The action source uses strict TypeScript and the Node.js test runner. TypeScript checks types, and ncc bundles the source and npm dependencies into the JavaScript distribution consumed by GitHub. Test helpers and release configuration use JavaScript. Dependencies are in [package.json](package.json), with development tools in [flake.nix](flake.nix).
+The action source, tests, and test helpers use strict TypeScript with the Node.js test runner. Test files use the `.test.ts` suffix under `tests/`, with real SOPS tests and fixtures under `tests/integration/`. TypeScript checks types, and ncc bundles the source and npm dependencies into the JavaScript distribution consumed by GitHub. Debug and release scripts use JavaScript. Dependencies are in [package.json](package.json), with development tools in [flake.nix](flake.nix).
 
 [Environment and checks](docs/development.md#environment-and-checks) | [Source debugging](docs/development.md#debug-the-source) | [Local workflow](docs/development.md#debug-the-workflow) | [Sibling checkout](docs/development.md#use-a-sibling-action-checkout) | [Development specification](docs/specs/local-action-debugging.md)
 

@@ -1,6 +1,6 @@
 import * as core from '@actions/core';
 import { readFileSync, rmSync } from 'node:fs';
-import { createFixture } from './fixture.js';
+import { createFixture } from './fixture.ts';
 
 const fixture = createFixture();
 try {

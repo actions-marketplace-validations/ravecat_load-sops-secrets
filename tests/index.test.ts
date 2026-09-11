@@ -4,14 +4,14 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import test from 'node:test';
+import test, { type TestContext } from 'node:test';
 
 const key = '# synthetic identity\nAGE-SECRET-KEY-SYNTHETIC';
 const keyMasks = `::add-mask::${key.replaceAll('\n', '%0A')}\n`;
 
 const actionDirectory = fileURLToPath(new URL('..', import.meta.url));
 
-function runAction(t, entry, document, options = {}) {
+function runAction(t: TestContext, entry: string, document: string, options: NodeJS.ProcessEnv = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'load-sops-test-'));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   const file = '-fixture $(touch injected).enc.json';
@@ -57,7 +57,10 @@ process.exit(Number(process.env.SOPS_TEST_EXIT || 0));
   assert.equal(readdirSync(directory).some(name => name.startsWith('sops-secrets.')), false);
   assert.equal(readdirSync(directory).includes('injected'), false);
   const calls = readdirSync(directory).includes('calls')
-    ? readFileSync(join(directory, 'calls'), 'utf8').trim().split('\n').map(JSON.parse)
+    ? readFileSync(join(directory, 'calls'), 'utf8').trim().split('\n').map(line => {
+      const call: unknown = JSON.parse(line);
+      return call;
+    })
     : [];
   if (calls.length > 0) {
     assert.deepEqual(calls, [['decrypt', '--output-type', 'json', resolve(workspace, file)]]);
@@ -66,11 +69,12 @@ process.exit(Number(process.env.SOPS_TEST_EXIT || 0));
   return { ...result, calls, output: readFileSync(join(directory, 'output'), 'utf8') };
 }
 
-function parseOutputs(text) {
-  const outputs = {};
+function parseOutputs(text: string) {
+  const outputs: Record<string, string> = {};
   while (text !== '') {
     const headerEnd = text.indexOf('\n');
     const [name, delimiter] = text.slice(0, headerEnd).split('<<');
+    assert.ok(name);
     assert.ok(delimiter);
     const end = text.indexOf(`\n${delimiter}\n`, headerEnd + 1);
     assert.ok(end >= 0);
@@ -109,7 +113,7 @@ for (const entry of ['src/index.ts', 'dist/index.js']) {
   });
 
   test(`${entry}: writes JSON keys unchanged at the GITHUB_OUTPUT boundary`, t => {
-    const secrets = {
+    const secrets: Record<string, string> = {
       'api.token': 'dotted-value',
       'api token': 'spaced-value',
       '123token': 'numeric-leading-value',
@@ -123,6 +127,7 @@ for (const entry of ['src/index.ts', 'dist/index.js']) {
     assert.deepEqual(headers.map(header => header.split('<<')[0]), Object.keys(secrets));
     for (const header of headers) {
       const [name, delimiter] = header.split('<<');
+      assert.ok(name);
       assert.ok(result.output.includes(`${header}\n${secrets[name]}\n${delimiter}\n`));
     }
   });
